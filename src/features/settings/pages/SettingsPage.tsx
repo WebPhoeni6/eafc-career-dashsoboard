@@ -145,7 +145,7 @@ export const SettingsPage: React.FC = () => {
 
       {card(
         'Appearance',
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '13px', color: 'var(--muted)' }}>Current theme:</span>
           <Button variant={theme === 'dark' ? 'accent' : 'ghost'} size="sm" icon={<Moon size={13} />} onClick={() => setTheme('dark')}>
             Dark

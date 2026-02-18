@@ -4,7 +4,8 @@ import { computeKPIs, computeForm, computeCompSplits, computePosSplits, isBigGam
 import { ovrOverTimeSeries, goalsAssistsPerMatchSeries, ratingTrendSeries, gaPer90Series, trustTrendSeries } from '../../services/analytics/charts';
 import { MILESTONES } from '../../utils/constants';
 
-export function getDashboardData(matches: Match[], career: CareerProfile | null) {
+export function getDashboardData(matches: Match[], career: CareerProfile | null, chartMatchesArg?: Match[]) {
+  const chartMatches = chartMatchesArg ?? matches;
   const kpis = computeKPIs(matches, career?.ovr);
   const form = computeForm(matches);
   const compSplits = computeCompSplits(matches);
@@ -22,11 +23,11 @@ export function getDashboardData(matches: Match[], career: CareerProfile | null)
   });
 
   const charts = {
-    ovr: ovrOverTimeSeries(matches, career?.ovr),
-    goalsAssists: goalsAssistsPerMatchSeries(matches),
-    rating: ratingTrendSeries(matches),
-    gaPer90: gaPer90Series(matches),
-    trust: trustTrendSeries(matches),
+    ovr: ovrOverTimeSeries(chartMatches, career?.ovr),
+    goalsAssists: goalsAssistsPerMatchSeries(chartMatches),
+    rating: ratingTrendSeries(chartMatches),
+    gaPer90: gaPer90Series(chartMatches),
+    trust: trustTrendSeries(chartMatches),
   };
 
   return { kpis, form, compSplits, posSplits, bigGamePerformer, milestones, charts };

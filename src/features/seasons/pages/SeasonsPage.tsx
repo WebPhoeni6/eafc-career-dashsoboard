@@ -72,7 +72,7 @@ export const SeasonsPage: React.FC = () => {
         return card(
           <div key={season}>
             <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '12px' }}>📅 {season}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px', marginBottom: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '12px' }}>
               {[
                 { label: 'Apps', value: kpis.apps },
                 { label: 'Goals', value: kpis.goals, color: '#22c55e' },
@@ -199,4 +199,5 @@ export const SeasonsPage: React.FC = () => {
     </div>
   );
 };
+
 

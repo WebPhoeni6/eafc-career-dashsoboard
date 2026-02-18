@@ -1,6 +1,6 @@
 import type { Match } from '../../types/match.types';
 import { num } from '../../utils/format';
-import { fmtDate } from '../../utils/date';
+import { fmtDateShort } from '../../utils/date';
 
 export interface ChartSeries {
   labels: string[];
@@ -17,7 +17,7 @@ function sortedByDate(matches: Match[]): Match[] {
 
 export function ovrOverTimeSeries(matches: Match[], baseOvr?: number): ChartSeries {
   const sorted = sortedByDate(matches).filter((m) => m.ovrAfter !== '' && m.ovrAfter !== null);
-  const labels = sorted.map((m) => fmtDate(m.matchDate) || `#${sorted.indexOf(m) + 1}`);
+  const labels = sorted.map((m) => fmtDateShort(m.matchDate) || `#${sorted.indexOf(m) + 1}`);
   const data = sorted.map((m) => num(m.ovrAfter));
   if (baseOvr !== undefined && sorted.length === 0) {
     labels.push('Start');
@@ -29,7 +29,7 @@ export function ovrOverTimeSeries(matches: Match[], baseOvr?: number): ChartSeri
 export function goalsAssistsPerMatchSeries(matches: Match[]): ChartSeries {
   const sorted = sortedByDate(matches);
   const labels = sorted.map((m, i) =>
-    m.matchDate ? fmtDate(m.matchDate) : `M${i + 1}`,
+    m.matchDate ? fmtDateShort(m.matchDate) : `M${i + 1}`,
   );
   return {
     labels,
@@ -43,7 +43,7 @@ export function goalsAssistsPerMatchSeries(matches: Match[]): ChartSeries {
 export function ratingTrendSeries(matches: Match[]): ChartSeries {
   const sorted = sortedByDate(matches);
   const labels = sorted.map((m, i) =>
-    m.matchDate ? fmtDate(m.matchDate) : `M${i + 1}`,
+    m.matchDate ? fmtDateShort(m.matchDate) : `M${i + 1}`,
   );
   return {
     labels,
@@ -62,7 +62,7 @@ export function gaPer90Series(matches: Match[]): ChartSeries {
     totalGA  += num(m.goals) + num(m.assists);
     totalMin += num(m.minutesPlayed, 90);
     data.push(totalMin > 0 ? (totalGA / totalMin) * 90 : 0);
-    labels.push(m.matchDate ? fmtDate(m.matchDate) : `M${i + 1}`);
+    labels.push(m.matchDate ? fmtDateShort(m.matchDate) : `M${i + 1}`);
   });
   return { labels, datasets: [{ label: 'G/A per 90', data, color: '#22c55e' }] };
 }
@@ -70,7 +70,7 @@ export function gaPer90Series(matches: Match[]): ChartSeries {
 export function trustTrendSeries(matches: Match[]): ChartSeries {
   const trustMap: Record<string, number> = { Full: 4, High: 3, Medium: 2, Low: 1 };
   const sorted = sortedByDate(matches);
-  const labels = sorted.map((m, i) => m.matchDate ? fmtDate(m.matchDate) : `M${i + 1}`);
+  const labels = sorted.map((m, i) => m.matchDate ? fmtDateShort(m.matchDate) : `M${i + 1}`);
   const data   = sorted.map((m) => trustMap[m.trust] ?? 2);
   return { labels, datasets: [{ label: 'Manager Trust', data, color: '#06b6d4' }] };
 }

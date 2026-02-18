@@ -50,8 +50,17 @@ const careerIdSchema = z.object({
   query: z.object({}).optional(),
 });
 
+const careerInsightsSchema = z.object({
+  body: z.object({}).optional(),
+  params: idParams,
+  query: z.object({
+    recentMatches: z.coerce.number().int().min(3).max(20).optional(),
+  }).optional(),
+});
+
 module.exports = {
   createCareerSchema,
   updateCareerSchema,
   careerIdSchema,
+  careerInsightsSchema,
 };

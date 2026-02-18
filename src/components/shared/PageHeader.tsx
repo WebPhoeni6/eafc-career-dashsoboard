@@ -9,6 +9,7 @@ interface PageHeaderProps {
 
 export const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, icon, actions }) => (
   <div
+    className="page-header"
     style={{
       display: 'flex',
       alignItems: 'flex-start',
@@ -21,6 +22,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, icon, a
     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
       {icon && (
         <div
+          className="page-header__icon"
           style={{
             width: '40px',
             height: '40px',
@@ -36,8 +38,8 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, icon, a
         </div>
       )}
       <div>
-        <h1 style={{ margin: 0, fontSize: '26px', fontWeight: 800, letterSpacing: '-0.02em' }}>{title}</h1>
-        {subtitle && <p style={{ margin: '3px 0 0', fontSize: '13px', color: 'var(--muted)' }}>{subtitle}</p>}
+        <h1 style={{ margin: 0, fontSize: 'clamp(20px, 4vw, 26px)', fontWeight: 800, letterSpacing: '-0.02em' }}>{title}</h1>
+        {subtitle && <p style={{ margin: '3px 0 0', fontSize: 'clamp(12px, 2.8vw, 13px)', color: 'var(--muted)' }}>{subtitle}</p>}
       </div>
     </div>
     {actions && <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>{actions}</div>}

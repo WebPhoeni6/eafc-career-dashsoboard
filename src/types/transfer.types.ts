@@ -7,8 +7,8 @@ export interface TransferOffer {
   league: string;
   country: string;
   role: RoleType;
-  wage: string; // e.g. "£45k/w"
-  fee: string;  // e.g. "€12M"
+  wage: string; // requested weekly wage, e.g. "$7,966"
+  fee: string; // compatibility field used as current wage for EAFC contract-style offer logging
   hasUCL: boolean;
   status: OfferStatus;
   receivedDate: string;

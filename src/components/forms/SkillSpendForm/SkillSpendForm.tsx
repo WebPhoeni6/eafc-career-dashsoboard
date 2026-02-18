@@ -26,16 +26,16 @@ export const SkillSpendForm: React.FC<SkillSpendFormProps> = ({ onSubmit, onCanc
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit(v); }} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
         <Input label="Date" type="date" value={v.date} onChange={(e) => set('date', e.target.value)} />
         <Input label="Points Spent" type="number" min={1} max={50} value={v.pointsSpent} onChange={(e) => set('pointsSpent', Number(e.target.value))} />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
         <Select label="Category" value={v.category} onChange={(e) => set('category', e.target.value as SkillSpend['category'])}
           options={SKILL_CATEGORIES.map((c) => ({ value: c, label: c }))} />
         <Input label="Attribute" value={v.attributeTarget} onChange={(e) => set('attributeTarget', e.target.value)} placeholder="Sprint Speed" required />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
         <Input label="From Value" type="number" min={0} max={99} value={v.fromValue} onChange={(e) => set('fromValue', Number(e.target.value))} />
         <Input label="To Value" type="number" min={0} max={99} value={v.toValue} onChange={(e) => set('toValue', Number(e.target.value))} />
       </div>
@@ -47,3 +47,4 @@ export const SkillSpendForm: React.FC<SkillSpendFormProps> = ({ onSubmit, onCanc
     </form>
   );
 };
+

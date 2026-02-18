@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { Footer } from './Footer';
@@ -17,6 +17,8 @@ import type { Match } from '../../types/match.types';
 type MatchDraft = Omit<Match, 'id' | 'createdAt' | 'updatedAt'>;
 
 export const AppShell: React.FC = () => {
+  const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [newMatchOpen, setNewMatchOpen] = useState(false);
   const [newMatchTab, setNewMatchTab] = useState<'manual' | 'image'>('manual');
   const [analysisFiles, setAnalysisFiles] = useState<File[]>([]);
@@ -87,6 +89,10 @@ export const AppShell: React.FC = () => {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [activeCareerId, career?.playerName, toast]);
+
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
 
   const handleAnalyze = async () => {
     if (!analysisFiles.length) {
@@ -179,11 +185,11 @@ export const AppShell: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg)' }}>
-      <Sidebar />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <Topbar />
-        <main style={{ flex: 1, overflowY: 'auto', padding: '22px 24px 24px' }}>
+    <div className="app-shell">
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <div className="app-shell__content">
+        <Topbar onMenuToggle={() => setSidebarOpen((prev) => !prev)} />
+        <main className="app-main">
           <Outlet context={{ openNewMatch: openNewMatchModal, searchRef }} />
         </main>
         <Footer />

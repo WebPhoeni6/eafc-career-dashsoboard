@@ -32,9 +32,9 @@ export const Modal: React.FC<ModalProps> = ({ open, onClose, title, children, wi
         inset: 0,
         background: 'rgba(3, 10, 8, 0.62)',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         justifyContent: 'center',
-        padding: '16px',
+        padding: '12px',
         zIndex: 1000,
         backdropFilter: 'blur(5px)',
       }}
@@ -42,7 +42,8 @@ export const Modal: React.FC<ModalProps> = ({ open, onClose, title, children, wi
       <div
         style={{
           width: `min(${width}, 96vw)`,
-          maxHeight: '90vh',
+          maxHeight: 'calc(100dvh - 24px)',
+          marginTop: '8px',
           display: 'flex',
           flexDirection: 'column',
           background: 'var(--panel-gradient)',
@@ -79,15 +80,16 @@ export const Modal: React.FC<ModalProps> = ({ open, onClose, title, children, wi
             </button>
           </div>
         )}
-        <div style={{ padding: '16px 18px', overflowY: 'auto', flex: 1 }}>{children}</div>
+        <div style={{ padding: 'clamp(12px, 2vw, 18px)', overflowY: 'auto', flex: 1 }}>{children}</div>
         {actions && (
           <div
             style={{
-              padding: '12px 18px',
+              padding: '12px clamp(12px, 2vw, 18px)',
               borderTop: '1px solid var(--border-muted)',
               display: 'flex',
               justifyContent: 'flex-end',
               gap: '10px',
+              flexWrap: 'wrap',
             }}
           >
             {actions}

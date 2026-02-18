@@ -38,6 +38,15 @@ const activateCareer = asyncHandler(async (req, res) => {
   return success(res, null, 'Career activated');
 });
 
+const getPerformanceInsights = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const query = req.validated?.query || req.query || {};
+  const data = await service.getPerformanceInsights(req.user.id, id, {
+    recentMatches: query.recentMatches,
+  });
+  return success(res, data, 'Performance insights generated');
+});
+
 module.exports = {
   listCareers,
   createCareer,
@@ -45,4 +54,5 @@ module.exports = {
   updateCareer,
   deleteCareer,
   activateCareer,
+  getPerformanceInsights,
 };

@@ -17,6 +17,24 @@ export type CreateCareerInput = CareerProfile & {
 
 export type UpdateCareerInput = Partial<CreateCareerInput>;
 
+export interface CareerPerformanceInsights {
+  summary: string;
+  momentum: 'improving' | 'stable' | 'declining';
+  confidence: number | null;
+  strengths: string[];
+  concerns: string[];
+  recommendations: {
+    nextMatch: string[];
+    training: string[];
+    season: string[];
+    transfers: string[];
+  };
+  keyMetricsToWatch: string[];
+  recentFormSnapshot: string;
+  recentMatchesConsidered: number;
+  generatedAt: string;
+}
+
 export async function listCareers(): Promise<CareerRecord[]> {
   return request('/api/careers');
 }
@@ -49,4 +67,9 @@ export async function activateCareer(id: string): Promise<void> {
   await request(`/api/careers/${id}/activate`, {
     method: 'POST',
   });
+}
+
+export async function getCareerPerformanceInsights(id: string, recentMatches = 8): Promise<CareerPerformanceInsights> {
+  const query = new URLSearchParams({ recentMatches: String(recentMatches) });
+  return request(`/api/careers/${id}/performance-insights?${query.toString()}`);
 }

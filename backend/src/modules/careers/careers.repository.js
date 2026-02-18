@@ -38,6 +38,29 @@ function deleteCareer(id) {
   return prisma.career.delete({ where: { id } });
 }
 
+function getCareerInsightsData(userId, id) {
+  return prisma.career.findFirst({
+    where: { id, userId },
+    include: {
+      matches: true,
+      trophies: true,
+      challenges: true,
+      narrativeTags: true,
+      skillSpends: true,
+      attributeTargets: true,
+      archetypeStage: true,
+      trainingLogs: true,
+      offers: true,
+      contracts: true,
+      agentNotes: true,
+      injuries: true,
+      suspensions: true,
+      pressNotes: true,
+      achievements: true,
+    },
+  });
+}
+
 module.exports = {
   assertCareerOwnership,
   listCareers,
@@ -45,4 +68,5 @@ module.exports = {
   getCareer,
   updateCareer,
   deleteCareer,
+  getCareerInsightsData,
 };

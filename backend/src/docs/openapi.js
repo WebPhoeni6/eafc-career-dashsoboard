@@ -159,6 +159,14 @@ const paths = {
       responses: { 200: defaultSuccess, 401: defaultError, 404: defaultError },
     },
   },
+  '/api/careers/{id}/performance-insights': {
+    get: {
+      tags: ['Careers'],
+      summary: 'Generate AI insights from recent performance and full career data',
+      parameters: [...authParam, idParam],
+      responses: { 200: defaultSuccess, 400: defaultError, 401: defaultError, 404: defaultError, 502: defaultError },
+    },
+  },
   '/api/careers/{careerId}/matches': {
     get: {
       tags: ['Matches'],

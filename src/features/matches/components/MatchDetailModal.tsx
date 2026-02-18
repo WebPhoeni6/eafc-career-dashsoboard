@@ -63,7 +63,7 @@ export const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ match: m, on
 
   return (
     <Modal open={!!m} onClose={onClose} title={`${m.opponent} - ${fmtDate(m.matchDate)}`} width="760px">
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
         <div>
           <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '8px', color: 'var(--muted)' }}>MATCH INFO</div>
           <Row label="Date" value={fmtDate(m.matchDate)} />
@@ -103,7 +103,7 @@ export const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ match: m, on
               alt="Match performance"
               style={{ width: '100%', maxHeight: '220px', objectFit: 'cover', borderRadius: '12px', border: '1px solid var(--border)' }}
             />
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <input
                 ref={imageInputRef}
                 type="file"
@@ -120,7 +120,7 @@ export const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ match: m, on
             </div>
           </div>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <input
               ref={imageInputRef}
               type="file"
@@ -143,7 +143,7 @@ export const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ match: m, on
       </div>
 
       {(m.ovrAfter !== '' || m.spAfter !== '') && (
-        <div style={{ marginTop: '12px', display: 'flex', gap: '12px', fontSize: '13px' }}>
+        <div style={{ marginTop: '12px', display: 'flex', gap: '12px', fontSize: '13px', flexWrap: 'wrap' }}>
           {m.ovrAfter !== '' && (
             <span style={{ color: 'var(--muted)' }}>
               OVR after: <strong style={{ color: 'var(--accent)' }}>{m.ovrAfter}</strong>

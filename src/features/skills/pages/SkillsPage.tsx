@@ -161,7 +161,7 @@ export const SkillsPage: React.FC = () => {
         </>}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <Input label="Attribute" value={tAttr} onChange={(e) => setTAttr(e.target.value)} placeholder="Sprint Speed" />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
             <Input label="Current" type="number" value={tFrom} onChange={(e) => setTFrom(Number(e.target.value))} />
             <Input label="Target" type="number" value={tTo} onChange={(e) => setTTo(Number(e.target.value))} />
           </div>
@@ -171,4 +171,5 @@ export const SkillsPage: React.FC = () => {
     </div>
   );
 };
+
 

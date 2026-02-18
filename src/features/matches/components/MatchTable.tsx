@@ -61,7 +61,7 @@ export const MatchTable: React.FC<MatchTableProps> = ({ matches, allMatchesCount
   return (
     <>
       <div style={{ overflowX: 'auto', borderRadius: '14px', border: '1px solid var(--border-muted)' }}>
-        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, minWidth: '900px' }}>
+        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, minWidth: '760px' }}>
           <thead>
             <tr>
               <th style={th}>#</th>

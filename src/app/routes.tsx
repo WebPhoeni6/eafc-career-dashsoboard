@@ -3,6 +3,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { AppShell } from './layout/AppShell';
 
 const DashboardPage    = lazy(() => import('../features/dashboard/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })));
+const CareersPage      = lazy(() => import('../features/careers/pages/CareersPage').then((m) => ({ default: m.CareersPage })));
 const MatchesPage      = lazy(() => import('../features/matches/pages/MatchesPage').then((m) => ({ default: m.MatchesPage })));
 const SeasonsPage      = lazy(() => import('../features/seasons/pages/SeasonsPage').then((m) => ({ default: m.SeasonsPage })));
 const SkillsPage       = lazy(() => import('../features/skills/pages/SkillsPage').then((m) => ({ default: m.SkillsPage })));
@@ -23,6 +24,7 @@ const router = createBrowserRouter([
     element: <AppShell />,
     children: [
       { index: true,             element: <Suspense fallback={<Loading />}><DashboardPage /></Suspense> },
+      { path: 'careers',         element: <Suspense fallback={<Loading />}><CareersPage /></Suspense> },
       { path: 'matches',         element: <Suspense fallback={<Loading />}><MatchesPage /></Suspense> },
       { path: 'seasons',         element: <Suspense fallback={<Loading />}><SeasonsPage /></Suspense> },
       { path: 'skills',          element: <Suspense fallback={<Loading />}><SkillsPage /></Suspense> },

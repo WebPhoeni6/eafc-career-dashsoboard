@@ -24,7 +24,7 @@ export const InternationalPage: React.FC = () => {
       {/* Caps summary */}
       {card(<>
         <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '14px' }}>🦅 Super Eagles Stats</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
           {[
             { label: 'Caps', value: kpis.apps },
             { label: 'Goals', value: kpis.goals, color: '#22c55e' },
@@ -37,7 +37,7 @@ export const InternationalPage: React.FC = () => {
             </div>
           ))}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px', marginTop: '10px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px', marginTop: '10px' }}>
           {[
             { label: 'W/D/L', value: `${kpis.wins}/${kpis.draws}/${kpis.losses}` },
             { label: 'G/A per 90', value: fmtDecimal(kpis.gaPer90) },
@@ -90,3 +90,4 @@ export const InternationalPage: React.FC = () => {
     </div>
   );
 };
+

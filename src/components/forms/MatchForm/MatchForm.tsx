@@ -65,9 +65,9 @@ export const MatchForm: React.FC<MatchFormProps> = ({ initial, prefill, prefillV
     onSubmit(v);
   };
 
-  const g2 = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' } as const;
-  const g3 = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' } as const;
-  const g4 = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px' } as const;
+  const g2 = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' } as const;
+  const g3 = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' } as const;
+  const g4 = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' } as const;
 
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -184,3 +184,4 @@ export const MatchForm: React.FC<MatchFormProps> = ({ initial, prefill, prefillV
     </form>
   );
 };
+

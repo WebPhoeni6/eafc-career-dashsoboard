@@ -8,6 +8,15 @@ export function fmtDate(iso: string | undefined | null): string {
   }
 }
 
+export function fmtDateShort(iso: string | undefined | null): string {
+  if (!iso) return '-';
+  try {
+    const d = new Date(iso.includes('T') ? iso : iso + 'T00:00:00');
+    return d.toLocaleDateString(undefined, { day: '2-digit', month: 'short' });
+  } catch {
+    return iso;
+  }
+}
 export function fmtMonth(ym: string): string {
   // ym = "2026-09"
   try {
@@ -37,3 +46,4 @@ export function currentMonth(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
+

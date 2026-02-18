@@ -36,8 +36,8 @@ interface KPIGridProps {
 }
 
 export const KPIGrid: React.FC<KPIGridProps> = ({ kpis, ratingTrend }) => {
-  const grid4 = { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px' } as const;
-  const grid3 = { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px' } as const;
+  const grid4 = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' } as const;
+  const grid3 = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px' } as const;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -67,3 +67,4 @@ export const KPIGrid: React.FC<KPIGridProps> = ({ kpis, ratingTrend }) => {
     </div>
   );
 };
+

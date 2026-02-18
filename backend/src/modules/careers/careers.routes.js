@@ -2,7 +2,12 @@ const express = require('express');
 const { requireAuth } = require('../../middlewares/auth');
 const validate = require('../../middlewares/validate');
 const controller = require('./careers.controller');
-const { createCareerSchema, updateCareerSchema, careerIdSchema } = require('./careers.validation');
+const {
+  createCareerSchema,
+  updateCareerSchema,
+  careerIdSchema,
+  careerInsightsSchema,
+} = require('./careers.validation');
 
 const router = express.Router();
 
@@ -16,6 +21,7 @@ const router = express.Router();
 router.use(requireAuth);
 router.get('/', controller.listCareers);
 router.post('/', validate(createCareerSchema), controller.createCareer);
+router.get('/:id/performance-insights', validate(careerInsightsSchema), controller.getPerformanceInsights);
 router.get('/:id', validate(careerIdSchema), controller.getCareer);
 router.patch('/:id', validate(updateCareerSchema), controller.updateCareer);
 router.delete('/:id', validate(careerIdSchema), controller.deleteCareer);
