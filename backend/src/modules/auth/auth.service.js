@@ -156,7 +156,7 @@ async function forgotPassword(input) {
 
   if (!config.isProduction) {
     payload.resetToken = rawToken;
-    payload.resetUrl = `${config.CORS_ORIGIN}/?mode=reset&token=${rawToken}`;
+    payload.resetUrl = `${config.primaryCorsOrigin}/?mode=reset&token=${rawToken}`;
   }
 
   return payload;

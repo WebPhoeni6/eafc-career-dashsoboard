@@ -4,6 +4,29 @@ const { z } = require("zod");
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
+function parseCorsOrigins(raw) {
+  return Array.from(
+    new Set(
+      String(raw || "")
+        .split(",")
+        .map((origin) => origin.trim().replace(/\/+$/, ""))
+        .filter(Boolean),
+    ),
+  );
+}
+
+function isValidCorsOrigin(origin) {
+  try {
+    const url = new URL(origin);
+    return (
+      (url.protocol === "http:" || url.protocol === "https:") &&
+      url.origin === origin
+    );
+  } catch (_) {
+    return false;
+  }
+}
+
 const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
@@ -20,7 +43,7 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(20).optional(),
   OPENAI_MODEL: z.string().default("gpt-4o-mini"),
   COOKIE_SECRET: z.string().min(16),
-  CORS_ORIGIN: z.string().url().or(z.string().startsWith("http://localhost")),
+  CORS_ORIGIN: z.string().min(1),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(5),
@@ -41,8 +64,24 @@ if (!parsed.success) {
 }
 
 const config = parsed.data;
+const corsOrigins = parseCorsOrigins(config.CORS_ORIGIN);
+
+if (!corsOrigins.length || corsOrigins.some((origin) => !isValidCorsOrigin(origin))) {
+  // eslint-disable-next-line no-console
+  console.error(
+    "Invalid environment configuration:",
+    {
+      CORS_ORIGIN: [
+        "Must be one or more comma-separated origins, e.g. http://localhost:5173,https://your-app.vercel.app",
+      ],
+    },
+  );
+  process.exit(1);
+}
 
 config.isProduction = config.NODE_ENV === "production";
+config.corsOrigins = corsOrigins;
+config.primaryCorsOrigin = corsOrigins[0];
 config.cookie = {
   httpOnly: true,
   sameSite: "strict",
