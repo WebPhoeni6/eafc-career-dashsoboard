@@ -24,6 +24,7 @@ const profileRoutes = require('./modules/profile/profile.routes');
 const syncRoutes = require('./modules/sync/sync.routes');
 
 const app = express();
+app.set('trust proxy', 1);
 
 app.use(
   pinoHttp({
@@ -49,11 +50,12 @@ app.use(
 app.use(cookieParser(config.COOKIE_SECRET));
 app.use(express.json({ limit: '2mb' }));
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
-app.use(generalLimiter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
+
+app.use(generalLimiter);
 
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/api/auth', authRoutes);

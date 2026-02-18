@@ -28,11 +28,17 @@ async function refreshAccessToken(): Promise<string | null> {
   if (refreshPromise) return refreshPromise;
 
   refreshPromise = (async () => {
-    const res = await fetch(buildUrl('/api/auth/refresh'), {
-      method: 'POST',
-      credentials: 'include',
-      headers: { Accept: 'application/json' },
-    });
+    let res: Response;
+    try {
+      res = await fetch(buildUrl('/api/auth/refresh'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { Accept: 'application/json' },
+      });
+    } catch (_) {
+      clearAccessToken();
+      return null;
+    }
 
     if (!res.ok) {
       clearAccessToken();
@@ -76,12 +82,21 @@ async function runRequest<T>(path: string, options: RequestOptions = {}, retry =
 
   if (!skipAuth && token) nextHeaders.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(buildUrl(path), {
-    ...rest,
-    credentials: 'include',
-    headers: nextHeaders,
-    body: payloadBody,
-  });
+  let res: Response;
+  try {
+    res = await fetch(buildUrl(path), {
+      ...rest,
+      credentials: 'include',
+      headers: nextHeaders,
+      body: payloadBody,
+    });
+  } catch (_) {
+    throw new ApiError(
+      'Network error: unable to reach backend. Check backend health, CORS origins, and VITE_API_BASE_URL.',
+      0,
+      'NETWORK_ERROR',
+    );
+  }
 
   if (res.status === 204) {
     return { success: true, message: 'No content', data: undefined as T };

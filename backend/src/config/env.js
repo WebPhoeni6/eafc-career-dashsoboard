@@ -84,7 +84,7 @@ config.corsOrigins = corsOrigins;
 config.primaryCorsOrigin = corsOrigins[0];
 config.cookie = {
   httpOnly: true,
-  sameSite: "strict",
+  sameSite: config.isProduction ? "none" : "lax",
   secure: config.isProduction,
   path: "/api/auth/refresh",
 };

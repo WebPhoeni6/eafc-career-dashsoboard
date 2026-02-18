@@ -4,6 +4,7 @@ const config = require('../config/env');
 const generalLimiter = rateLimit({
   windowMs: config.RATE_LIMIT_WINDOW_MS,
   max: config.RATE_LIMIT_MAX,
+  skip: (req) => req.path === '/api/health',
   standardHeaders: true,
   legacyHeaders: false,
   message: {
