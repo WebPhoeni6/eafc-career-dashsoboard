@@ -4,7 +4,7 @@ import { fmtDate } from '../../../utils/date';
 import { fmtRating, num, resultLabel } from '../../../utils/format';
 import { getAutoTags, tagColor } from '../utils';
 import { Button } from '../../../components/ui/Button';
-import { Eye, Pencil, Trash2, Pin } from 'lucide-react';
+import { Eye, Pencil, Trash2, Pin, ImageIcon } from 'lucide-react';
 import { MatchDetailModal } from './MatchDetailModal';
 
 interface MatchTableProps {
@@ -13,9 +13,11 @@ interface MatchTableProps {
   onEdit: (m: Match) => void;
   onDelete: (id: string) => void;
   onPin: (id: string) => void;
+  onUploadImage: (id: string, file: File) => Promise<void>;
+  onDeleteImage: (id: string) => Promise<void>;
 }
 
-export const MatchTable: React.FC<MatchTableProps> = ({ matches, allMatchesCount, onEdit, onDelete, onPin }) => {
+export const MatchTable: React.FC<MatchTableProps> = ({ matches, allMatchesCount, onEdit, onDelete, onPin, onUploadImage, onDeleteImage }) => {
   const [detail, setDetail] = useState<Match | null>(null);
 
   const th: React.CSSProperties = {
@@ -33,7 +35,7 @@ export const MatchTable: React.FC<MatchTableProps> = ({ matches, allMatchesCount
   const td: React.CSSProperties = {
     padding: '8px 10px',
     fontSize: '12px',
-    borderBottom: '1px solid rgba(34,48,74,0.4)',
+    borderBottom: '1px solid var(--border-muted)',
     whiteSpace: 'nowrap',
   };
 
@@ -58,7 +60,7 @@ export const MatchTable: React.FC<MatchTableProps> = ({ matches, allMatchesCount
 
   return (
     <>
-      <div style={{ overflowX: 'auto', borderRadius: '14px', border: '1px solid rgba(34,48,74,0.6)' }}>
+      <div style={{ overflowX: 'auto', borderRadius: '14px', border: '1px solid var(--border-muted)' }}>
         <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, minWidth: '900px' }}>
           <thead>
             <tr>
@@ -74,6 +76,7 @@ export const MatchTable: React.FC<MatchTableProps> = ({ matches, allMatchesCount
               <th style={th}>Rating</th>
               <th style={th}>OVR</th>
               <th style={th}>Trust</th>
+              <th style={th}>Image</th>
               <th style={th}>Tags</th>
               <th style={th}>Actions</th>
             </tr>
@@ -108,6 +111,9 @@ export const MatchTable: React.FC<MatchTableProps> = ({ matches, allMatchesCount
                   <td style={{ ...td, color: 'var(--muted)' }}>{m.ovrAfter !== '' && m.ovrAfter !== null ? m.ovrAfter : '—'}</td>
                   <td style={{ ...td, color: 'var(--muted)' }}>{m.trust}</td>
                   <td style={td}>
+                    {m.performanceImageUrl ? <ImageIcon size={14} color="var(--accent)" /> : <span style={{ color: 'var(--muted)' }}>-</span>}
+                  </td>
+                  <td style={td}>
                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                       {tags.map((tag) => (
                         <span key={tag} style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '999px', background: tagColor(tag) + '22', color: tagColor(tag), border: `1px solid ${tagColor(tag)}44` }}>
@@ -131,7 +137,13 @@ export const MatchTable: React.FC<MatchTableProps> = ({ matches, allMatchesCount
         </table>
       </div>
 
-      <MatchDetailModal match={detail} onClose={() => setDetail(null)} />
+      <MatchDetailModal
+        match={detail}
+        onClose={() => setDetail(null)}
+        onUploadImage={onUploadImage}
+        onDeleteImage={onDeleteImage}
+      />
     </>
   );
 };
+

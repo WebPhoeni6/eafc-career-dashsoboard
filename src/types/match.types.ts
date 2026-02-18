@@ -36,6 +36,7 @@ export interface Match {
   spAfter: number | '';
   trust: ManagerTrust;
   notes: string;
+  performanceImageUrl?: string;
   pinned: boolean;
   createdAt: string;
   updatedAt: string;

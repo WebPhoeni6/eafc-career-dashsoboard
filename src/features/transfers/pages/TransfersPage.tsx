@@ -43,7 +43,7 @@ export const TransfersPage: React.FC = () => {
   const statusColor: Record<string, string> = { Pending: '#f59e0b', Accepted: '#22c55e', Rejected: '#ef4444', Expired: '#9aa7bd' };
 
   const card = (children: React.ReactNode) => (
-    <div style={{ background: 'linear-gradient(180deg,rgba(16,24,42,0.92),rgba(15,23,41,0.92))', border: '1px solid rgba(34,48,74,0.75)', borderRadius: '16px', padding: '18px' }}>
+    <div style={{ background: 'var(--card-gradient)', border: '1px solid var(--border)', borderRadius: '16px', padding: '18px' }}>
       {children}
     </div>
   );
@@ -70,7 +70,7 @@ export const TransfersPage: React.FC = () => {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {offers.map((o) => (
-                    <div key={o.id} style={{ padding: '14px', borderRadius: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(34,48,74,0.6)', display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+                    <div key={o.id} style={{ padding: '14px', borderRadius: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-muted)', display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '6px' }}>
                           <span style={{ fontWeight: 700, fontSize: '14px' }}>{o.club}</span>
@@ -108,7 +108,7 @@ export const TransfersPage: React.FC = () => {
                   </tr></thead>
                   <tbody>
                     {contracts.map((c) => (
-                      <tr key={c.id} style={{ borderTop: '1px solid rgba(34,48,74,0.4)' }}>
+                      <tr key={c.id} style={{ borderTop: '1px solid var(--border-muted)' }}>
                         <td style={{ padding: '7px 8px', fontWeight: 600 }}>{c.club}</td>
                         <td style={{ textAlign: 'center' }}>{c.league}</td>
                         <td style={{ textAlign: 'center', color: 'var(--muted)' }}>{c.startSeason}–{c.endSeason}</td>
@@ -131,7 +131,7 @@ export const TransfersPage: React.FC = () => {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {agentNotes.map((n) => (
-                    <div key={n.id} style={{ padding: '12px', borderRadius: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(34,48,74,0.5)', display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+                    <div key={n.id} style={{ padding: '12px', borderRadius: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-muted)', display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
                       <div>
                         <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' }}>{fmtDate(n.date)} · {n.tag}</div>
                         <div style={{ fontSize: '13px' }}>{n.content}</div>
@@ -214,3 +214,4 @@ export const TransfersPage: React.FC = () => {
     </div>
   );
 };
+

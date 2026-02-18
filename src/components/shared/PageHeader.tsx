@@ -8,23 +8,36 @@ interface PageHeaderProps {
 }
 
 export const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, icon, actions }) => (
-  <div style={{
-    display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
-    gap: '12px', marginBottom: '20px', flexWrap: 'wrap',
-  }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+  <div
+    style={{
+      display: 'flex',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: '12px',
+      marginBottom: '20px',
+      flexWrap: 'wrap',
+    }}
+  >
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
       {icon && (
-        <div style={{
-          width: '36px', height: '36px', borderRadius: '10px',
-          background: 'rgba(124,92,255,0.15)',
-          display: 'grid', placeItems: 'center', color: 'var(--accent)',
-        }}>
+        <div
+          style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: '12px',
+            background: 'linear-gradient(145deg, rgba(16,185,129,0.22), rgba(14,165,233,0.16))',
+            border: '1px solid var(--border)',
+            display: 'grid',
+            placeItems: 'center',
+            color: 'var(--accent)',
+          }}
+        >
           {icon}
         </div>
       )}
       <div>
-        <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 800 }}>{title}</h1>
-        {subtitle && <p style={{ margin: '2px 0 0', fontSize: '13px', color: 'var(--muted)' }}>{subtitle}</p>}
+        <h1 style={{ margin: 0, fontSize: '26px', fontWeight: 800, letterSpacing: '-0.02em' }}>{title}</h1>
+        {subtitle && <p style={{ margin: '3px 0 0', fontSize: '13px', color: 'var(--muted)' }}>{subtitle}</p>}
       </div>
     </div>
     {actions && <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>{actions}</div>}

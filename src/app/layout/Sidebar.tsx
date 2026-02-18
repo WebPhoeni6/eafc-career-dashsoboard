@@ -1,50 +1,54 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import {
-  LayoutDashboard, Swords, CalendarDays, Dumbbell,
-  ArrowLeftRight, Globe2, User, Settings,
+  LayoutDashboard,
+  Swords,
+  CalendarDays,
+  Dumbbell,
+  ArrowLeftRight,
+  Globe2,
+  User,
+  Settings,
 } from 'lucide-react';
+import crest from '../../assets/brand/crest.svg';
 
 const navItems = [
-  { to: '/',               label: 'Dashboard',      icon: LayoutDashboard },
-  { to: '/matches',        label: 'Matches',        icon: Swords },
-  { to: '/seasons',        label: 'Seasons',        icon: CalendarDays },
-  { to: '/skills',         label: 'Skills',         icon: Dumbbell },
-  { to: '/transfers',      label: 'Transfers',      icon: ArrowLeftRight },
-  { to: '/international',  label: 'International',  icon: Globe2 },
-  { to: '/profile',        label: 'Profile',        icon: User },
-  { to: '/settings',       label: 'Settings',       icon: Settings },
+  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/matches', label: 'Matches', icon: Swords },
+  { to: '/seasons', label: 'Seasons', icon: CalendarDays },
+  { to: '/skills', label: 'Skills', icon: Dumbbell },
+  { to: '/transfers', label: 'Transfers', icon: ArrowLeftRight },
+  { to: '/international', label: 'International', icon: Globe2 },
+  { to: '/profile', label: 'Profile', icon: User },
+  { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export const Sidebar: React.FC = () => (
-  <aside style={{
-    width: 'var(--sidebar-w)',
-    minHeight: '100vh',
-    background: 'rgba(10,14,24,0.7)',
-    borderRight: '1px solid rgba(34,48,74,0.5)',
-    display: 'flex',
-    flexDirection: 'column',
-    paddingTop: '14px',
-    backdropFilter: 'blur(8px)',
-    flexShrink: 0,
-  }}>
-    {/* Logo */}
-    <div style={{ padding: '0 16px 20px', borderBottom: '1px solid rgba(34,48,74,0.4)' }}>
+  <aside
+    style={{
+      width: 'var(--sidebar-w)',
+      minHeight: '100vh',
+      background: 'var(--panel-gradient)',
+      borderRight: '1px solid var(--border)',
+      display: 'flex',
+      flexDirection: 'column',
+      paddingTop: '14px',
+      backdropFilter: 'blur(8px)',
+      flexShrink: 0,
+      boxShadow: 'var(--shadow-sm)',
+    }}
+  >
+    <div style={{ padding: '0 16px 20px', borderBottom: '1px solid var(--border-muted)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <div style={{
-          width: '36px', height: '36px', borderRadius: '10px',
-          background: 'linear-gradient(135deg, rgba(124,92,255,0.9), rgba(34,197,94,0.8))',
-          display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '13px',
-        }}>FC</div>
+        <img src={crest} alt="FC Career Tracker" style={{ width: '38px', height: '38px' }} />
         <div>
-          <div style={{ fontWeight: 700, fontSize: '13px' }}>FC 26 Tracker</div>
-          <div style={{ fontSize: '11px', color: 'var(--muted)' }}>Career Mode</div>
+          <div style={{ fontWeight: 800, fontSize: '14px', letterSpacing: '-0.01em' }}>Career Tracker</div>
+          <div style={{ fontSize: '11px', color: 'var(--muted)' }}>FC26 Manager Hub</div>
         </div>
       </div>
     </div>
 
-    {/* Nav */}
-    <nav style={{ flex: 1, padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+    <nav style={{ flex: 1, padding: '14px 10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
       {navItems.map(({ to, label, icon: Icon }) => (
         <NavLink
           key={to}
@@ -53,14 +57,15 @@ export const Sidebar: React.FC = () => (
           style={({ isActive }) => ({
             display: 'flex',
             alignItems: 'center',
-            gap: '10px',
-            padding: '9px 12px',
-            borderRadius: '10px',
+            gap: '11px',
+            padding: '10px 13px',
+            borderRadius: '12px',
             color: isActive ? 'var(--text)' : 'var(--muted)',
-            background: isActive ? 'rgba(124,92,255,0.15)' : 'transparent',
-            fontWeight: isActive ? 600 : 400,
+            background: isActive ? 'linear-gradient(90deg, rgba(16,185,129,0.24), rgba(20,184,166,0.15))' : 'transparent',
+            border: isActive ? '1px solid var(--border)' : '1px solid transparent',
+            fontWeight: isActive ? 700 : 500,
             fontSize: '13px',
-            transition: 'background 0.18s, color 0.18s',
+            transition: 'all var(--transition)',
             textDecoration: 'none',
           })}
         >
@@ -70,8 +75,8 @@ export const Sidebar: React.FC = () => (
       ))}
     </nav>
 
-    <div style={{ padding: '12px 16px', fontSize: '11px', color: 'var(--muted)', borderTop: '1px solid rgba(34,48,74,0.4)' }}>
-      v2.0.0 • LocalStorage
+    <div style={{ padding: '12px 16px', fontSize: '11px', color: 'var(--muted)', borderTop: '1px solid var(--border-muted)' }}>
+      v2.1.0 • Cloud Sync Ready
     </div>
   </aside>
 );

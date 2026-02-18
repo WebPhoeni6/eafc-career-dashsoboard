@@ -1,0 +1,437 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Position {
+  GK
+  CB
+  LB
+  RB
+  CDM
+  CM
+  CAM
+  LW
+  RW
+  CF
+  ST
+}
+
+enum PreferredFoot {
+  Left
+  Right
+}
+
+enum Competition {
+  Friendly
+  League
+  Cup
+  UCL
+  UEL
+  International
+  Other
+}
+
+enum Stage {
+  NA
+  Group
+  RoundOf16
+  QuarterFinal
+  SemiFinal
+  Final
+}
+
+enum ManagerTrust {
+  Full
+  High
+  Medium
+  Low
+}
+
+enum SkillCategory {
+  Pace
+  Dribbling
+  Finishing
+  Passing
+  Physicality
+  Defending
+  WeakFoot
+  SkillMoves
+  Other
+}
+
+enum SuspensionType {
+  Yellow
+  Red
+  Accumulated
+}
+
+enum PressTag {
+  Praise
+  Rumor
+  Transfer
+  Objective
+  Other
+}
+
+enum OfferStatus {
+  Pending
+  Accepted
+  Rejected
+  Expired
+}
+
+enum RoleType {
+  Crucial
+  Important
+  Rotation
+  Bench
+}
+
+enum TrainingGrade {
+  A
+  B
+  C
+  D
+}
+
+model User {
+  id                  String               @id @default(cuid())
+  email               String               @unique
+  username            String               @unique
+  passwordHash        String
+  avatarUrl           String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  careers             Career[]
+  tokens              Token[]
+  passwordResetTokens PasswordResetToken[]
+}
+
+model Token {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Career {
+  id               String            @id @default(cuid())
+  userId           String
+  saveName         String
+  playerName       String
+  nationality      String
+  archetype        String
+  primaryPos       Position
+  secondaryPos     Position?
+  club             String
+  season           String
+  ovr              Int
+  spAvailable      Int
+  height           String
+  weight           String
+  preferredFoot    PreferredFoot
+  weakFootStars    Int
+  skillMoves       Int
+  badgeUrl         String?
+  flagUrl          String?
+  profileUpdatedAt DateTime?
+  isActive         Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  matches          Match[]
+  trophies         Trophy[]
+  challenges       SeasonChallenge[]
+  narrativeTags    NarrativeTag[]
+  skillSpends      SkillSpend[]
+  attributeTargets AttributeTarget[]
+  archetypeStage   ArchetypeStage?
+  trainingLogs     TrainingLog[]
+  offers           TransferOffer[]
+  contracts        Contract[]
+  agentNotes       AgentNote[]
+  injuries         InjuryLog[]
+  suspensions      Suspension[]
+  pressNotes       PressNote[]
+  achievements     Achievement[]
+
+  @@index([userId])
+  @@index([userId, isActive])
+  @@index([createdAt])
+}
+
+model Match {
+  id                  String       @id @default(cuid())
+  careerId            String
+  competition         Competition
+  stage               Stage
+  matchDate           String
+  opponent            String
+  posPlayed           Position
+  scoreFor            Int
+  scoreAgainst        Int
+  minutesPlayed       Int
+  matchRating         Float
+  goals               Int
+  assists             Int
+  shots               Int
+  shotsOnTarget       Int
+  xG                  Float
+  keyPasses           Int
+  chancesCreated      Int
+  dribblesAttempted   Int
+  dribblesCompleted   Int
+  passAccuracy        Float
+  crossAccuracy       Float
+  motm                Boolean
+  clutchMoment        Boolean
+  objectivesCompleted Boolean
+  objectivesNotes     String
+  opponentStrength    Int
+  ovrAfter            Int?
+  spAfter             Int?
+  trust               ManagerTrust
+  notes               String
+  performanceImageUrl String?
+  pinned              Boolean      @default(false)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  career              Career       @relation(fields: [careerId], references: [id], onDelete: Cascade)
+
+  @@index([careerId, matchDate])
+  @@index([careerId, competition])
+  @@index([careerId, posPlayed])
+  @@index([careerId, pinned])
+}
+
+model Trophy {
+  id          String   @id @default(cuid())
+  careerId    String
+  name        String
+  competition String
+  season      String
+  date        String
+  createdAt   DateTime @default(now())
+  career      Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+
+  @@index([careerId])
+}
+
+model SeasonChallenge {
+  id        String   @id @default(cuid())
+  careerId  String
+  season    String
+  label     String
+  target    Int
+  current   Int
+  unit      String
+  completed Boolean
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  career    Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+
+  @@index([careerId])
+}
+
+model NarrativeTag {
+  id        String   @id @default(cuid())
+  careerId  String
+  season    String
+  tag       String
+  createdAt DateTime @default(now())
+  career    Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+
+  @@index([careerId])
+}
+
+model SkillSpend {
+  id              String        @id @default(cuid())
+  careerId        String
+  date            String
+  pointsSpent     Int
+  category        SkillCategory
+  attributeTarget String
+  fromValue       Int
+  toValue         Int
+  notes           String
+  createdAt       DateTime      @default(now())
+  career          Career        @relation(fields: [careerId], references: [id], onDelete: Cascade)
+
+  @@index([careerId])
+}
+
+model AttributeTarget {
+  id           String   @id @default(cuid())
+  careerId     String
+  attribute    String
+  currentValue Int
+  targetValue  Int
+  deadline     String
+  achieved     Boolean
+  notes        String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  career       Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+
+  @@index([careerId])
+}
+
+model ArchetypeStage {
+  id           String   @id @default(cuid())
+  careerId     String   @unique
+  archetype    String
+  stage        Int
+  currentPerks Json
+  nextUnlock   String
+  checklist    Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  career       Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+}
+
+model TrainingLog {
+  id        String       @id @default(cuid())
+  careerId  String
+  week      String
+  drills    Json
+  grade     TrainingGrade
+  xpGained  Int
+  notes     String
+  createdAt DateTime     @default(now())
+  career    Career       @relation(fields: [careerId], references: [id], onDelete: Cascade)
+
+  @@index([careerId])
+}
+
+model TransferOffer {
+  id           String      @id @default(cuid())
+  careerId     String
+  club         String
+  league       String
+  country      String
+  role         RoleType
+  wage         String
+  fee          String
+  hasUCL       Boolean
+  status       OfferStatus
+  receivedDate String
+  decisionDate String?
+  notes        String
+  score        Int?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  career       Career      @relation(fields: [careerId], references: [id], onDelete: Cascade)
+
+  @@index([careerId])
+}
+
+model Contract {
+  id          String   @id @default(cuid())
+  careerId    String
+  club        String
+  league      String
+  startSeason String
+  endSeason   String
+  apps        Int
+  goals       Int
+  assists     Int
+  avgRating   Float
+  trophies    Json
+  notes       String
+  createdAt   DateTime @default(now())
+  career      Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+
+  @@index([careerId])
+}
+
+model AgentNote {
+  id        String   @id @default(cuid())
+  careerId  String
+  date      String
+  content   String
+  tag       String
+  createdAt DateTime @default(now())
+  career    Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+
+  @@index([careerId])
+}
+
+model InjuryLog {
+  id            String   @id @default(cuid())
+  careerId      String
+  type          String
+  startDate     String
+  returnDate    String?
+  matchesMissed Int
+  notes         String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  career        Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+
+  @@index([careerId])
+}
+
+model Suspension {
+  id            String         @id @default(cuid())
+  careerId      String
+  type          SuspensionType
+  matchesMissed Int
+  competition   String
+  date          String
+  notes         String
+  createdAt     DateTime       @default(now())
+  career        Career         @relation(fields: [careerId], references: [id], onDelete: Cascade)
+
+  @@index([careerId])
+}
+
+model PressNote {
+  id        String    @id @default(cuid())
+  careerId  String
+  month     String
+  content   String
+  tag       PressTag?
+  createdAt DateTime  @default(now())
+  career    Career    @relation(fields: [careerId], references: [id], onDelete: Cascade)
+
+  @@index([careerId])
+}
+
+model Achievement {
+  id          String   @id @default(cuid())
+  careerId    String
+  key         String
+  label       String
+  description String
+  icon        String
+  unlockedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  career      Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+
+  @@index([careerId])
+  @@index([careerId, key])
+}

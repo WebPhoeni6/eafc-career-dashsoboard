@@ -47,7 +47,7 @@ export const SeasonsPage: React.FC = () => {
   }
 
   const card = (children: React.ReactNode) => (
-    <div style={{ background: 'linear-gradient(180deg,rgba(16,24,42,0.92),rgba(15,23,41,0.92))', border: '1px solid rgba(34,48,74,0.75)', borderRadius: '16px', padding: '18px' }}>
+    <div style={{ background: 'var(--card-gradient)', border: '1px solid var(--border)', borderRadius: '16px', padding: '18px' }}>
       {children}
     </div>
   );
@@ -79,7 +79,7 @@ export const SeasonsPage: React.FC = () => {
                 { label: 'Assists', value: kpis.assists, color: '#7c5cff' },
                 { label: 'Avg ★', value: fmtRating(kpis.avgRating), color: '#f59e0b' },
               ].map(({ label, value, color }) => (
-                <div key={label} style={{ textAlign: 'center', padding: '10px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(34,48,74,0.5)' }}>
+                <div key={label} style={{ textAlign: 'center', padding: '10px', borderRadius: '10px', background: 'rgba(255,255,255,0.045)', border: '1px solid var(--border-muted)' }}>
                   <div style={{ fontSize: '11px', color: 'var(--muted)' }}>{label}</div>
                   <div style={{ fontSize: '18px', fontWeight: 800, color: color ?? 'var(--text)' }}>{value}</div>
                 </div>
@@ -199,3 +199,4 @@ export const SeasonsPage: React.FC = () => {
     </div>
   );
 };
+

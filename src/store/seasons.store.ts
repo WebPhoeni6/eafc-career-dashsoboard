@@ -1,8 +1,7 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { KEYS } from '../services/storage/storage.keys';
 import type { Trophy, SeasonChallenge, NarrativeTag } from '../types/season.types';
-import { uid } from '../utils/id';
+import * as seasonsApi from '../services/api/seasons.api';
+import { useCareerStore } from './career.store';
 import { nowISO } from '../utils/date';
 
 interface SeasonsState {
@@ -10,30 +9,81 @@ interface SeasonsState {
   challenges: SeasonChallenge[];
   narrativeTags: NarrativeTag[];
 
-  addTrophy: (t: Omit<Trophy, 'id'>) => void;
-  deleteTrophy: (id: string) => void;
-  addChallenge: (c: Omit<SeasonChallenge, 'id'>) => void;
-  updateChallenge: (id: string, c: Partial<SeasonChallenge>) => void;
-  deleteChallenge: (id: string) => void;
-  addNarrativeTag: (t: Omit<NarrativeTag, 'id' | 'createdAt'>) => void;
-  deleteNarrativeTag: (id: string) => void;
+  loadSeasons: (careerId?: string) => Promise<void>;
+  addTrophy: (t: Omit<Trophy, 'id'>) => Promise<void>;
+  deleteTrophy: (id: string) => Promise<void>;
+  addChallenge: (c: Omit<SeasonChallenge, 'id'>) => Promise<void>;
+  updateChallenge: (id: string, c: Partial<SeasonChallenge>) => Promise<void>;
+  deleteChallenge: (id: string) => Promise<void>;
+  addNarrativeTag: (t: Omit<NarrativeTag, 'id' | 'createdAt'>) => Promise<void>;
+  deleteNarrativeTag: (id: string) => Promise<void>;
+  resetState: () => void;
 }
 
-export const useSeasonsStore = create<SeasonsState>()(
-  persist(
-    (set) => ({
-      trophies: [],
-      challenges: [],
-      narrativeTags: [],
+function getCareerId(explicit?: string): string {
+  const id = explicit || useCareerStore.getState().activeCareerId;
+  if (!id) throw new Error('No active career selected');
+  return id;
+}
 
-      addTrophy: (t) => set((s) => ({ trophies: [...s.trophies, { ...t, id: uid() }] })),
-      deleteTrophy: (id) => set((s) => ({ trophies: s.trophies.filter((x) => x.id !== id) })),
-      addChallenge: (c) => set((s) => ({ challenges: [...s.challenges, { ...c, id: uid() }] })),
-      updateChallenge: (id, c) => set((s) => ({ challenges: s.challenges.map((x) => x.id === id ? { ...x, ...c } : x) })),
-      deleteChallenge: (id) => set((s) => ({ challenges: s.challenges.filter((x) => x.id !== id) })),
-      addNarrativeTag: (t) => set((s) => ({ narrativeTags: [...s.narrativeTags, { ...t, id: uid(), createdAt: nowISO() }] })),
-      deleteNarrativeTag: (id) => set((s) => ({ narrativeTags: s.narrativeTags.filter((x) => x.id !== id) })),
-    }),
-    { name: KEYS.SEASONS },
-  ),
-);
+export const useSeasonsStore = create<SeasonsState>()((set) => ({
+  trophies: [],
+  challenges: [],
+  narrativeTags: [],
+
+  loadSeasons: async (careerId) => {
+    const id = getCareerId(careerId);
+    const [trophies, challenges, narrativeTags] = await Promise.all([
+      seasonsApi.listTrophies(id),
+      seasonsApi.listChallenges(id),
+      seasonsApi.listNarrativeTags(id),
+    ]);
+    set({ trophies, challenges, narrativeTags });
+  },
+
+  addTrophy: async (trophy) => {
+    const id = getCareerId();
+    const created = await seasonsApi.createTrophy(id, trophy);
+    set((state) => ({ trophies: [...state.trophies, created] }));
+  },
+
+  deleteTrophy: async (id) => {
+    const careerId = getCareerId();
+    await seasonsApi.deleteTrophy(careerId, id);
+    set((state) => ({ trophies: state.trophies.filter((item) => item.id !== id) }));
+  },
+
+  addChallenge: async (challenge) => {
+    const careerId = getCareerId();
+    const created = await seasonsApi.createChallenge(careerId, challenge);
+    set((state) => ({ challenges: [...state.challenges, created] }));
+  },
+
+  updateChallenge: async (id, challenge) => {
+    const careerId = getCareerId();
+    const updated = await seasonsApi.updateChallenge(careerId, id, challenge);
+    set((state) => ({
+      challenges: state.challenges.map((item) => (item.id === id ? updated : item)),
+    }));
+  },
+
+  deleteChallenge: async (id) => {
+    const careerId = getCareerId();
+    await seasonsApi.deleteChallenge(careerId, id);
+    set((state) => ({ challenges: state.challenges.filter((item) => item.id !== id) }));
+  },
+
+  addNarrativeTag: async (tag) => {
+    const careerId = getCareerId();
+    const created = await seasonsApi.createNarrativeTag(careerId, { ...tag, createdAt: nowISO() });
+    set((state) => ({ narrativeTags: [...state.narrativeTags, created] }));
+  },
+
+  deleteNarrativeTag: async (id) => {
+    const careerId = getCareerId();
+    await seasonsApi.deleteNarrativeTag(careerId, id);
+    set((state) => ({ narrativeTags: state.narrativeTags.filter((item) => item.id !== id) }));
+  },
+
+  resetState: () => set({ trophies: [], challenges: [], narrativeTags: [] }),
+}));

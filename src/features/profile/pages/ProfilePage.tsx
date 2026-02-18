@@ -13,6 +13,7 @@ import { User, PlusCircle, Trash2 } from 'lucide-react';
 import { useToast } from '../../../hooks/useToast';
 import { fmtDate } from '../../../utils/date';
 import { computeKPIs } from '../../../services/analytics/kpis';
+import { hydrateActiveCareerModules, hydrateCareerModules } from '../../../services/api/hydrate';
 
 import { todayISO } from '../../../utils/date';
 
@@ -29,7 +30,7 @@ export const ProfilePage: React.FC = () => {
   const [pv, setPv] = useState({ month: '', content: '', tag: 'Other' as 'Praise' | 'Rumor' | 'Transfer' | 'Objective' | 'Other' });
 
   const card = (children: React.ReactNode) => (
-    <div style={{ background: 'linear-gradient(180deg,rgba(16,24,42,0.92),rgba(15,23,41,0.92))', border: '1px solid rgba(34,48,74,0.75)', borderRadius: '16px', padding: '18px' }}>
+    <div style={{ background: 'var(--card-gradient)', border: '1px solid var(--border)', borderRadius: '16px', padding: '18px' }}>
       {children}
     </div>
   );
@@ -37,7 +38,7 @@ export const ProfilePage: React.FC = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
       <PageHeader title="Player Profile" subtitle="Career profile, injuries, availability & press notes" icon={<User size={18} />}
-        actions={career ? <Button variant="danger" size="sm" onClick={() => { if (window.confirm('Reset career? Matches stay.')) { clearCareer(); toast('Career reset', 'default'); } }}>Reset Career</Button> : undefined}
+        actions={career ? <Button variant="danger" size="sm" onClick={() => { void (async () => { if (window.confirm('Delete active career and linked data?')) { await clearCareer(); await hydrateActiveCareerModules(); toast('Career deleted', 'default'); } })(); }}>Delete Career</Button> : undefined}
       />
 
       {/* Player hero card */}
@@ -66,7 +67,7 @@ export const ProfilePage: React.FC = () => {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', textAlign: 'center' }}>
             {[{ label: 'Apps', value: kpis.apps }, { label: 'Goals', value: kpis.goals, color: '#22c55e' }, { label: 'Assists', value: kpis.assists, color: '#7c5cff' }].map(({ label, value, color }) => (
-              <div key={label} style={{ padding: '8px 12px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(34,48,74,0.5)' }}>
+              <div key={label} style={{ padding: '8px 12px', borderRadius: '10px', background: 'rgba(255,255,255,0.045)', border: '1px solid var(--border-muted)' }}>
                 <div style={{ fontSize: '10px', color: 'var(--muted)' }}>{label}</div>
                 <div style={{ fontSize: '16px', fontWeight: 800, color: color ?? 'var(--text)' }}>{value}</div>
               </div>
@@ -79,7 +80,7 @@ export const ProfilePage: React.FC = () => {
         {(tab) => (
           <>
             {tab === 'profile' && card(
-              <CareerProfileForm initial={career} onSave={(c) => { setCareer(c); toast('Career saved ✅', 'success'); }} />
+              <CareerProfileForm initial={career} onSave={(c) => { void (async () => { await setCareer(c); const activeCareerId = useCareerStore.getState().activeCareerId; if (activeCareerId) await hydrateCareerModules(activeCareerId); toast('Career saved', 'success'); })(); }} />
             )}
 
             {tab === 'injuries' && card(<>
@@ -137,7 +138,7 @@ export const ProfilePage: React.FC = () => {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {pressNotes.map((n) => (
-                    <div key={n.id} style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(34,48,74,0.4)', display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+                    <div key={n.id} style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-muted)', display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
                       <div>
                         <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '3px' }}>{n.month} · {n.tag}</div>
                         <div style={{ fontSize: '13px' }}>{n.content}</div>
@@ -203,3 +204,4 @@ export const ProfilePage: React.FC = () => {
     </div>
   );
 };
+

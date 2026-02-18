@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Input } from '../../ui/Input';
 import { Select } from '../../ui/Select';
 import { Textarea } from '../../ui/Textarea';
@@ -30,15 +30,22 @@ function defaultMatchValues(): MatchFormValues {
 
 interface MatchFormProps {
   initial?: Partial<MatchFormValues>;
+  prefill?: Partial<MatchFormValues> | null;
+  prefillVersion?: number;
   onSubmit: (m: MatchFormValues) => void;
   onCancel?: () => void;
   submitLabel?: string;
 }
 
-export const MatchForm: React.FC<MatchFormProps> = ({ initial, onSubmit, onCancel, submitLabel = 'Add Match' }) => {
+export const MatchForm: React.FC<MatchFormProps> = ({ initial, prefill, prefillVersion, onSubmit, onCancel, submitLabel = 'Add Match' }) => {
   const [v, setV] = useState<MatchFormValues>({ ...defaultMatchValues(), ...initial });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  useEffect(() => {
+    if (!prefill) return;
+    setV((prev) => ({ ...prev, ...prefill }));
+  }, [prefillVersion]);
 
   const set = <K extends keyof MatchFormValues>(field: K, value: MatchFormValues[K]) =>
     setV((prev) => ({ ...prev, [field]: value }));

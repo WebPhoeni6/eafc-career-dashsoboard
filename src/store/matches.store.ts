@@ -1,10 +1,8 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { KEYS } from '../services/storage/storage.keys';
 import type { Match, Competition } from '../types/match.types';
 import type { Position } from '../types/career.types';
-import { uid } from '../utils/id';
-import { nowISO } from '../utils/date';
+import * as matchesApi from '../services/api/matches.api';
+import { useCareerStore } from './career.store';
 
 interface MatchFilter {
   search: string;
@@ -19,13 +17,18 @@ interface MatchesState {
   matches: Match[];
   filter: MatchFilter;
 
-  addMatch: (m: Omit<Match, 'id' | 'createdAt' | 'updatedAt'>) => Match;
-  updateMatch: (id: string, m: Partial<Match>) => void;
-  deleteMatch: (id: string) => void;
-  togglePin: (id: string) => void;
+  loadMatches: (careerId?: string) => Promise<void>;
+  addMatch: (m: Omit<Match, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Match>;
+  updateMatch: (id: string, m: Partial<Omit<Match, 'id' | 'createdAt' | 'updatedAt'>>) => Promise<void>;
+  deleteMatch: (id: string) => Promise<void>;
+  togglePin: (id: string) => Promise<void>;
+  uploadPerformanceImage: (id: string, file: File) => Promise<void>;
+  deletePerformanceImage: (id: string) => Promise<void>;
+  analyzePerformanceImages: (files: File[]) => Promise<matchesApi.MatchAnalysisResult>;
   setFilter: (f: Partial<MatchFilter>) => void;
   resetFilter: () => void;
   importMatches: (matches: Match[]) => void;
+  resetState: () => void;
 }
 
 const defaultFilter: MatchFilter = {
@@ -37,40 +40,74 @@ const defaultFilter: MatchFilter = {
   pinnedOnly: false,
 };
 
-export const useMatchesStore = create<MatchesState>()(
-  persist(
-    (set) => ({
-      matches: [],
-      filter: defaultFilter,
+function getCareerId(explicit?: string): string {
+  const id = explicit || useCareerStore.getState().activeCareerId;
+  if (!id) throw new Error('No active career selected');
+  return id;
+}
 
-      addMatch: (m) => {
-        const match: Match = { ...m, id: uid(), createdAt: nowISO(), updatedAt: nowISO() };
-        set((s) => ({ matches: [...s.matches, match] }));
-        return match;
-      },
+export const useMatchesStore = create<MatchesState>()((set) => ({
+  matches: [],
+  filter: defaultFilter,
 
-      updateMatch: (id, m) =>
-        set((s) => ({
-          matches: s.matches.map((x) =>
-            x.id === id ? { ...x, ...m, updatedAt: nowISO() } : x,
-          ),
-        })),
+  loadMatches: async (careerId) => {
+    const id = getCareerId(careerId);
+    const items = await matchesApi.listMatches(id, { page: 1, limit: 1000 });
+    set({ matches: items });
+  },
 
-      deleteMatch: (id) =>
-        set((s) => ({ matches: s.matches.filter((x) => x.id !== id) })),
+  addMatch: async (m) => {
+    const careerId = getCareerId();
+    const match = await matchesApi.createMatch(careerId, m);
+    set((state) => ({ matches: [...state.matches, match] }));
+    return match;
+  },
 
-      togglePin: (id) =>
-        set((s) => ({
-          matches: s.matches.map((x) =>
-            x.id === id ? { ...x, pinned: !x.pinned } : x,
-          ),
-        })),
+  updateMatch: async (id, m) => {
+    const careerId = getCareerId();
+    const updated = await matchesApi.updateMatch(careerId, id, m);
+    set((state) => ({
+      matches: state.matches.map((item) => (item.id === id ? updated : item)),
+    }));
+  },
 
-      setFilter: (f) => set((s) => ({ filter: { ...s.filter, ...f } })),
-      resetFilter: () => set({ filter: defaultFilter }),
+  deleteMatch: async (id) => {
+    const careerId = getCareerId();
+    await matchesApi.deleteMatch(careerId, id);
+    set((state) => ({ matches: state.matches.filter((item) => item.id !== id) }));
+  },
 
-      importMatches: (matches) => set({ matches }),
-    }),
-    { name: KEYS.MATCHES },
-  ),
-);
+  togglePin: async (id) => {
+    const careerId = getCareerId();
+    const updated = await matchesApi.togglePin(careerId, id);
+    set((state) => ({
+      matches: state.matches.map((item) => (item.id === id ? updated : item)),
+    }));
+  },
+
+  uploadPerformanceImage: async (id, file) => {
+    const careerId = getCareerId();
+    const updated = await matchesApi.uploadPerformanceImage(careerId, id, file);
+    set((state) => ({
+      matches: state.matches.map((item) => (item.id === id ? updated : item)),
+    }));
+  },
+
+  deletePerformanceImage: async (id) => {
+    const careerId = getCareerId();
+    const updated = await matchesApi.deletePerformanceImage(careerId, id);
+    set((state) => ({
+      matches: state.matches.map((item) => (item.id === id ? updated : item)),
+    }));
+  },
+
+  analyzePerformanceImages: async (files) => {
+    const careerId = getCareerId();
+    return matchesApi.analyzePerformanceImages(careerId, files);
+  },
+
+  setFilter: (f) => set((state) => ({ filter: { ...state.filter, ...f } })),
+  resetFilter: () => set({ filter: defaultFilter }),
+  importMatches: (matches) => set({ matches }),
+  resetState: () => set({ matches: [], filter: defaultFilter }),
+}));

@@ -2,17 +2,17 @@ import React from 'react';
 import { useToast } from '../../hooks/useToast';
 
 const typeColors: Record<string, string> = {
-  default:     'rgba(12,18,32,0.95)',
-  success:     'rgba(16,40,24,0.95)',
-  error:       'rgba(40,14,14,0.95)',
-  achievement: 'rgba(20,14,40,0.95)',
+  default: 'var(--panel)',
+  success: 'rgba(16, 100, 70, 0.9)',
+  error: 'rgba(96, 24, 24, 0.92)',
+  achievement: 'rgba(14, 78, 88, 0.92)',
 };
 
 const typeBorders: Record<string, string> = {
-  default:     'rgba(34,48,74,0.8)',
-  success:     'rgba(34,197,94,0.4)',
-  error:       'rgba(239,68,68,0.4)',
-  achievement: 'rgba(124,92,255,0.5)',
+  default: 'var(--border)',
+  success: 'rgba(34,197,94,0.45)',
+  error: 'rgba(239,68,68,0.45)',
+  achievement: 'rgba(14,165,233,0.45)',
 };
 
 export const Toast: React.FC = () => {

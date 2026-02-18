@@ -11,12 +11,12 @@ import { LineChart } from '../../../components/charts/LineChart';
 import { BarChart } from '../../../components/charts/BarChart';
 import { PageHeader } from '../../../components/shared/PageHeader';
 import { LayoutDashboard, Star, Trophy } from 'lucide-react';
-import { exportAllData } from '../../../services/export/exportJson';
+import { downloadCareerExport } from '../../../services/api/sync.api';
 import { useToast } from '../../../hooks/useToast';
 import { fmtRating } from '../../../utils/format';
 
 export const DashboardPage: React.FC = () => {
-  const { career, achievements } = useCareerStore();
+  const { career, achievements, activeCareerId } = useCareerStore();
   const matches = useMatchesStore((s) => s.matches);
   const { trophies } = useSeasonsStore();
   const toast = useToast((s) => s.show);
@@ -25,15 +25,23 @@ export const DashboardPage: React.FC = () => {
   const data = getDashboardData(matches, career);
   const { kpis, form, compSplits, posSplits, bigGamePerformer, milestones, charts } = data;
 
-  const handleExport = () => {
-    exportAllData({ career, matches }, career?.playerName);
-    toast('Exported ✅', 'success');
+  const handleExport = async () => {
+    if (!activeCareerId) {
+      toast('No active career to export', 'error');
+      return;
+    }
+    try {
+      await downloadCareerExport(activeCareerId, career?.playerName);
+      toast('Exported', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Export failed', 'error');
+    }
   };
 
   const card = (children: React.ReactNode, style?: React.CSSProperties) => (
     <div style={{
-      background: 'linear-gradient(180deg,rgba(16,24,42,0.92),rgba(15,23,41,0.92))',
-      border: '1px solid rgba(34,48,74,0.75)',
+      background: 'var(--card-gradient)',
+      border: '1px solid var(--border)',
       borderRadius: '16px',
       padding: '16px',
       ...style,
@@ -48,7 +56,7 @@ export const DashboardPage: React.FC = () => {
         title="Dashboard"
         subtitle={career ? `${career.playerName} • ${career.club} • ${career.season}` : 'Set up your career profile to get started'}
         icon={<LayoutDashboard size={18} />}
-        actions={<QuickActions onNewMatch={() => context?.openNewMatch()} onExport={handleExport} />}
+        actions={<QuickActions onNewMatch={() => context?.openNewMatch()} onExport={() => { void handleExport(); }} />}
       />
 
       {/* Big game + achievement badges */}
@@ -132,7 +140,7 @@ export const DashboardPage: React.FC = () => {
             </tr></thead>
             <tbody>
               {compSplits.map((c) => (
-                <tr key={c.competition} style={{ borderTop: '1px solid rgba(34,48,74,0.4)' }}>
+                <tr key={c.competition} style={{ borderTop: '1px solid var(--border-muted)' }}>
                   <td style={{ padding: '6px 0' }}>{c.competition}</td>
                   <td style={{ textAlign: 'center' }}>{c.apps}</td>
                   <td style={{ textAlign: 'center', color: '#22c55e' }}>{c.goals}</td>
@@ -154,7 +162,7 @@ export const DashboardPage: React.FC = () => {
             </tr></thead>
             <tbody>
               {posSplits.map((p) => (
-                <tr key={p.position} style={{ borderTop: '1px solid rgba(34,48,74,0.4)' }}>
+                <tr key={p.position} style={{ borderTop: '1px solid var(--border-muted)' }}>
                   <td style={{ padding: '6px 0' }}>{p.position}</td>
                   <td style={{ textAlign: 'center' }}>{p.apps}</td>
                   <td style={{ textAlign: 'center', color: '#22c55e' }}>{p.goals}</td>
@@ -184,3 +192,5 @@ export const DashboardPage: React.FC = () => {
     </div>
   );
 };
+
+

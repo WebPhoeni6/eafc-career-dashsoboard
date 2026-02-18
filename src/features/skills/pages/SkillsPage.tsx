@@ -22,7 +22,7 @@ export const SkillsPage: React.FC = () => {
   const totalSpent = skillSpends.reduce((s, x) => s + x.pointsSpent, 0);
 
   const card = (children: React.ReactNode) => (
-    <div style={{ background: 'linear-gradient(180deg,rgba(16,24,42,0.92),rgba(15,23,41,0.92))', border: '1px solid rgba(34,48,74,0.75)', borderRadius: '16px', padding: '18px' }}>
+    <div style={{ background: 'var(--card-gradient)', border: '1px solid var(--border)', borderRadius: '16px', padding: '18px' }}>
       {children}
     </div>
   );
@@ -61,7 +61,7 @@ export const SkillsPage: React.FC = () => {
                   </tr></thead>
                   <tbody>
                     {[...skillSpends].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((s) => (
-                      <tr key={s.id} style={{ borderTop: '1px solid rgba(34,48,74,0.4)' }}>
+                      <tr key={s.id} style={{ borderTop: '1px solid var(--border-muted)' }}>
                         <td style={{ padding: '7px 8px' }}>{fmtDate(s.date)}</td>
                         <td style={{ textAlign: 'center', color: 'var(--accent)', fontWeight: 700 }}>{s.pointsSpent}</td>
                         <td style={{ textAlign: 'center' }}>{s.category}</td>
@@ -134,7 +134,7 @@ export const SkillsPage: React.FC = () => {
                   </tr></thead>
                   <tbody>
                     {trainingLogs.map((l) => (
-                      <tr key={l.id} style={{ borderTop: '1px solid rgba(34,48,74,0.4)' }}>
+                      <tr key={l.id} style={{ borderTop: '1px solid var(--border-muted)' }}>
                         <td style={{ padding: '7px 8px' }}>{l.week}</td>
                         <td style={{ textAlign: 'center', fontWeight: 700, color: l.grade === 'A' ? '#22c55e' : l.grade === 'B' ? '#f59e0b' : '#ef4444' }}>{l.grade}</td>
                         <td style={{ textAlign: 'center', color: 'var(--accent)' }}>{l.xpGained}</td>
@@ -171,3 +171,4 @@ export const SkillsPage: React.FC = () => {
     </div>
   );
 };
+

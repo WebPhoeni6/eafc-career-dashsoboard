@@ -14,7 +14,7 @@ import { useToast } from '../../../hooks/useToast';
 import type { Match } from '../../../types/match.types';
 
 export const MatchesPage: React.FC = () => {
-  const { matches, filter, setFilter, resetFilter, updateMatch, deleteMatch, togglePin } = useMatchesStore();
+  const { matches, filter, setFilter, resetFilter, updateMatch, deleteMatch, togglePin, uploadPerformanceImage, deletePerformanceImage } = useMatchesStore();
   const toast = useToast((s) => s.show);
   const context = useOutletContext<{ openNewMatch: () => void } | null>();
 
@@ -25,25 +25,59 @@ export const MatchesPage: React.FC = () => {
 
   const handleEdit = (m: Match) => setEditMatch(m);
 
-  const handleEditSubmit = (values: Omit<Match, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const handleEditSubmit = async (values: Omit<Match, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!editMatch) return;
-    updateMatch(editMatch.id, values);
-    setEditMatch(null);
-    toast('Match updated ✅', 'success');
+    try {
+      await updateMatch(editMatch.id, values);
+      setEditMatch(null);
+      toast('Match updated', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to update match', 'error');
+    }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteId) return;
-    deleteMatch(deleteId);
-    setDeleteId(null);
-    toast('Match deleted 🗑️', 'default');
+    try {
+      await deleteMatch(deleteId);
+      setDeleteId(null);
+      toast('Match deleted', 'default');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to delete match', 'error');
+    }
+  };
+
+  const handlePin = async (id: string) => {
+    try {
+      await togglePin(id);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to pin match', 'error');
+    }
+  };
+
+  const handleUploadImage = async (id: string, file: File) => {
+    try {
+      await uploadPerformanceImage(id, file);
+      toast('Image uploaded', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to upload image', 'error');
+    }
+  };
+
+  const handleDeleteImage = async (id: string) => {
+    try {
+      await deletePerformanceImage(id);
+      toast('Image removed', 'default');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to remove image', 'error');
+    }
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <PageHeader
         title="Match Log"
-        subtitle={`${matches.length} matches logged • ${filtered.length} shown`}
+        subtitle={`${matches.length} matches logged - ${filtered.length} shown`}
         icon={<Swords size={18} />}
         actions={
           <Button variant="green" icon={<PlusCircle size={15} />} onClick={() => context?.openNewMatch()}>
@@ -63,29 +97,29 @@ export const MatchesPage: React.FC = () => {
         allMatchesCount={matches.length}
         onEdit={handleEdit}
         onDelete={(id) => setDeleteId(id)}
-        onPin={togglePin}
+        onPin={(id) => { void handlePin(id); }}
+        onUploadImage={handleUploadImage}
+        onDeleteImage={handleDeleteImage}
       />
 
-      {/* Edit Modal */}
       <Modal open={!!editMatch} onClose={() => setEditMatch(null)} title="Edit Match" width="900px">
         {editMatch && (
           <MatchForm
             initial={editMatch}
-            onSubmit={handleEditSubmit}
+            onSubmit={(values) => { void handleEditSubmit(values); }}
             onCancel={() => setEditMatch(null)}
             submitLabel="Save Changes"
           />
         )}
       </Modal>
 
-      {/* Confirm delete */}
       <ConfirmDialog
         open={!!deleteId}
         title="Delete Match"
         message="Are you sure you want to delete this match? This cannot be undone."
         confirmLabel="Delete"
         danger
-        onConfirm={handleDelete}
+        onConfirm={() => { void handleDelete(); }}
         onCancel={() => setDeleteId(null)}
       />
     </div>
