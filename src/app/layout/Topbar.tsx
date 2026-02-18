@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, LogOut, Sun, Moon, Trash2, Search, Bell, Mail, Menu } from 'lucide-react';
+import { Download, LogOut, Sun, Moon, Trash2, Search, Menu } from 'lucide-react';
 import { useCareerStore } from '../../store/career.store';
 import { Button } from '../../components/ui/Button';
 import { useToast } from '../../hooks/useToast';
@@ -76,13 +76,6 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuToggle }) => {
       </div>
 
       <div className="topbar-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-        <button className="topbar-hide-sm" style={iconButtonStyle} aria-label="Messages">
-          <Mail size={15} />
-        </button>
-        <button className="topbar-hide-sm" style={iconButtonStyle} aria-label="Notifications">
-          <Bell size={15} />
-        </button>
-
         <Button
           variant="ghost"
           size="sm"

@@ -94,7 +94,6 @@ export const MatchesPage: React.FC = () => {
 
       <MatchTable
         matches={filtered}
-        allMatchesCount={matches.length}
         onEdit={handleEdit}
         onDelete={(id) => setDeleteId(id)}
         onPin={(id) => { void handlePin(id); }}

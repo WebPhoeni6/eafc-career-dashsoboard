@@ -172,10 +172,6 @@ table.table-scroll {
     gap: 8px;
   }
 
-  .topbar-menu-btn {
-    display: inline-grid;
-  }
-
   .topbar-search {
     max-width: none !important;
   }
@@ -188,6 +184,12 @@ table.table-scroll {
 
   .topbar-hide-md {
     display: none !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .topbar-menu-btn {
+    display: inline-grid;
   }
 
   .app-sidebar {
@@ -219,9 +221,7 @@ table.table-scroll {
     opacity: 1;
     pointer-events: auto;
   }
-}
 
-@media (max-width: 768px) {
   .topbar {
     flex-wrap: wrap;
     height: auto;
