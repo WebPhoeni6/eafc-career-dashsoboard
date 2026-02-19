@@ -52,7 +52,7 @@ const matchPayload = z.object({
   spAfter: ovrSpSchema,
   trust: trustEnum,
   notes: z.string(),
-  performanceImageUrl: z.string().optional().or(z.literal('')),
+  performanceImageUrl: z.string().optional().nullable().or(z.literal('')),
   pinned: z.boolean().optional(),
   createdAt: z.string().datetime().optional(),
   updatedAt: z.string().datetime().optional(),

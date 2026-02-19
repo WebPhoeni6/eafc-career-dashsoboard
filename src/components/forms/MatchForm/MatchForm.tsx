@@ -37,6 +37,19 @@ function defaultMatchValues(): MatchFormValues {
   };
 }
 
+const MATCH_FORM_KEYS = Object.keys(defaultMatchValues()) as Array<keyof MatchFormValues>;
+
+function pickFormValues(source?: Partial<MatchFormValues> | null): Partial<MatchFormValues> {
+  if (!source || typeof source !== 'object') return {};
+  const out: Partial<MatchFormValues> = {};
+  for (const key of MATCH_FORM_KEYS) {
+    if (source[key] !== undefined) {
+      (out as Record<string, unknown>)[key] = source[key] as unknown;
+    }
+  }
+  return out;
+}
+
 interface MatchFormProps {
   initial?: Partial<MatchFormValues>;
   prefill?: Partial<MatchFormValues> | null;
@@ -49,17 +62,18 @@ interface MatchFormProps {
 
 export const MatchForm: React.FC<MatchFormProps> = ({ initial, prefill, prefillVersion, draftKey, onSubmit, onCancel, submitLabel = 'Add Match' }) => {
   const [v, setV] = useState<MatchFormValues>(() => {
+    const initialValues = pickFormValues(initial);
     const base = {
       ...defaultMatchValues(),
-      ...initial,
-      ...(normalizeMatchDate(initial?.matchDate) ? { matchDate: normalizeMatchDate(initial?.matchDate) } : {}),
+      ...initialValues,
+      ...(normalizeMatchDate(initialValues.matchDate) ? { matchDate: normalizeMatchDate(initialValues.matchDate) } : {}),
     };
 
     if (!draftKey || initial) return base;
     try {
       const raw = localStorage.getItem(draftKey);
       if (!raw) return base;
-      const parsed = JSON.parse(raw) as Partial<MatchFormValues>;
+      const parsed = pickFormValues(JSON.parse(raw) as Partial<MatchFormValues>);
       const normalizedDate = normalizeMatchDate(parsed.matchDate);
       return {
         ...base,
@@ -76,10 +90,11 @@ export const MatchForm: React.FC<MatchFormProps> = ({ initial, prefill, prefillV
 
   useEffect(() => {
     if (!prefill) return;
-    const normalizedDate = normalizeMatchDate(prefill.matchDate);
+    const safePrefill = pickFormValues(prefill);
+    const normalizedDate = normalizeMatchDate(safePrefill.matchDate);
     setV((prev) => ({
       ...prev,
-      ...prefill,
+      ...safePrefill,
       ...(normalizedDate ? { matchDate: normalizedDate } : {}),
     }));
   }, [prefillVersion]);
@@ -122,7 +137,11 @@ export const MatchForm: React.FC<MatchFormProps> = ({ initial, prefill, prefillV
     if (v.matchRating < 0 || v.matchRating > 10) errs.matchRating = 'Rating must be 0–10';
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});
-    const payload = { ...v, matchDate: normalizedDate };
+    const payload = {
+      ...defaultMatchValues(),
+      ...pickFormValues(v),
+      matchDate: normalizedDate,
+    };
     const result = onSubmit(payload);
     if (draftKey && !initial) {
       Promise.resolve(result)
@@ -138,10 +157,11 @@ export const MatchForm: React.FC<MatchFormProps> = ({ initial, prefill, prefillV
   const clearDraft = () => {
     if (!draftKey || initial) return;
     localStorage.removeItem(draftKey);
+    const safePrefill = pickFormValues(prefill);
     setV({
       ...defaultMatchValues(),
-      ...(prefill ?? {}),
-      ...(normalizeMatchDate(prefill?.matchDate) ? { matchDate: normalizeMatchDate(prefill?.matchDate) } : {}),
+      ...safePrefill,
+      ...(normalizeMatchDate(safePrefill.matchDate) ? { matchDate: normalizeMatchDate(safePrefill.matchDate) } : {}),
     });
     setErrors({});
   };

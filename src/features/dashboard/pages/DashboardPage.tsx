@@ -47,6 +47,9 @@ export const DashboardPage: React.FC = () => {
   const addAgentNote = useTransfersStore((s) => s.addAgentNote);
   const toast = useToast((s) => s.show);
   const context = useOutletContext<{ openNewMatch: () => void } | null>();
+  const [isMobile, setIsMobile] = useState<boolean>(
+    typeof window !== 'undefined' ? window.innerWidth <= 760 : false,
+  );
   const [chartRange, setChartRange] = useState<ChartRange>('LAST_6M');
   const [compSort, setCompSort] = useState<{ key: CompSortKey; direction: SortDirection }>({
     key: 'apps',
@@ -74,6 +77,12 @@ export const DashboardPage: React.FC = () => {
     'dashboard.hidden.completed.milestones.v1',
     [],
   );
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 760);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const chartRangeOptions = useMemo(
     () => [
@@ -384,6 +393,49 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
+  const buildShareStatsText = () => {
+    if (!career) return '';
+    const lines = [
+      `${career.playerName} - Career Stats`,
+      `${career.club} | ${career.season}`,
+      '',
+      `Apps: ${kpis.apps}`,
+      `Goals: ${kpis.goals}`,
+      `Assists: ${kpis.assists}`,
+      `G/A: ${kpis.ga}`,
+      `Avg Rating: ${fmtRating(kpis.avgRating)}`,
+      `Win Rate: ${Math.round(kpis.winRate)}%`,
+      `MOTM: ${kpis.motmCount}`,
+      `Hat-tricks: ${kpis.hatTricks}`,
+      '',
+      'Tracked with FC Career Tracker',
+    ];
+    return lines.join('\n');
+  };
+
+  const handleShareStats = async () => {
+    const text = buildShareStatsText();
+    if (!text) {
+      toast('No career stats to share yet', 'error');
+      return;
+    }
+
+    try {
+      if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+        await navigator.share({
+          title: career ? `${career.playerName} Career Stats` : 'Career Stats',
+          text,
+        });
+        toast('Shared', 'success');
+        return;
+      }
+      await navigator.clipboard.writeText(text);
+      toast('Share text copied', 'success');
+    } catch {
+      toast('Share failed', 'error');
+    }
+  };
+
   const handleCreateAgentNoteFromSuggestion = async (text: string, tag: 'Strategy' | 'Goal' = 'Strategy') => {
     const content = text.trim();
     if (!content) return;
@@ -499,7 +551,13 @@ export const DashboardPage: React.FC = () => {
         title="Dashboard"
         subtitle={career ? `${career.playerName} • ${career.club} • ${career.season}` : 'Set up your career profile to get started'}
         icon={<LayoutDashboard size={18} />}
-        actions={<QuickActions onNewMatch={() => context?.openNewMatch()} onExport={() => { void handleExport(); }} />}
+        actions={
+          <QuickActions
+            onNewMatch={() => context?.openNewMatch()}
+            onExport={() => { void handleExport(); }}
+            onShare={() => { void handleShareStats(); }}
+          />
+        }
       />
 
       {/* Big game + achievement badges */}
@@ -848,8 +906,8 @@ export const DashboardPage: React.FC = () => {
       {/* Charts row */}
       {card(
         <div style={{ display: 'grid', gap: '14px' }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <div style={{ width: '100%', maxWidth: '230px' }}>
+          <div style={{ display: 'flex', justifyContent: isMobile ? 'stretch' : 'flex-end' }}>
+            <div style={{ width: '100%', maxWidth: isMobile ? '100%' : '230px' }}>
               <Select
                 label="Chart Window"
                 value={chartRange}
@@ -859,22 +917,22 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '14px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: '14px' }}>
             {card(<>
               <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>OVR Over Time</div>
-              <LineChart series={charts.ovr} height={180} yMin={40} yMax={99} />
+              <LineChart series={charts.ovr} height={isMobile ? 200 : 180} yMin={40} yMax={99} />
             </>)}
             {card(<>
               <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>Goals & Assists Per Match</div>
-              <LineChart series={charts.goalsAssists} height={180} yMin={0} />
+              <LineChart series={charts.goalsAssists} height={isMobile ? 200 : 180} yMin={0} />
             </>)}
             {card(<>
               <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>Rating Trend</div>
-              <LineChart series={charts.rating} height={180} yMin={0} yMax={10} />
+              <LineChart series={charts.rating} height={isMobile ? 200 : 180} yMin={0} yMax={10} />
             </>)}
             {card(<>
               <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>G/A per 90 (Rolling)</div>
-              <LineChart series={charts.gaPer90} height={180} />
+              <LineChart series={charts.gaPer90} height={isMobile ? 200 : 180} />
             </>)}
           </div>
         </div>,
