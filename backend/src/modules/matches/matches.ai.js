@@ -3,7 +3,7 @@ const { AppError } = require('../../middlewares/error');
 
 function normalizeModelName(model) {
   const raw = String(model || '').trim();
-  return raw.replace(/^models\//i, '') || 'gemini-2.5-flash';
+  return raw.replace(/^models\//i, '') || 'gemini-2.0-flash';
 }
 
 function extractOutputText(payload) {

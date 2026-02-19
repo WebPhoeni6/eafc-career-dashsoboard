@@ -35,6 +35,14 @@ export interface CareerPerformanceInsights {
   generatedAt: string;
 }
 
+export interface CareerPerformanceQuestionResponse {
+  question: string;
+  answer: string;
+  confidence: number | null;
+  recentMatchesConsidered: number;
+  generatedAt: string;
+}
+
 export async function listCareers(): Promise<CareerRecord[]> {
   return request('/api/careers');
 }
@@ -72,4 +80,18 @@ export async function activateCareer(id: string): Promise<void> {
 export async function getCareerPerformanceInsights(id: string, recentMatches = 8): Promise<CareerPerformanceInsights> {
   const query = new URLSearchParams({ recentMatches: String(recentMatches) });
   return request(`/api/careers/${id}/performance-insights?${query.toString()}`);
+}
+
+export async function askCareerPerformanceQuestion(
+  id: string,
+  question: string,
+  recentMatches = 8,
+): Promise<CareerPerformanceQuestionResponse> {
+  return request(`/api/careers/${id}/performance-insights/ask`, {
+    method: 'POST',
+    body: {
+      question,
+      recentMatches,
+    },
+  });
 }

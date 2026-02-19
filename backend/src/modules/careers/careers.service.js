@@ -296,6 +296,35 @@ async function getPerformanceInsights(userId, id, options = {}) {
   };
 }
 
+async function askPerformanceInsightsQuestion(userId, id, options = {}) {
+  const question = typeof options.question === 'string' ? options.question.trim() : '';
+  if (!question) throw new AppError('Question is required', 400, 'BAD_REQUEST');
+
+  const requested = Number(options.recentMatches || 8);
+  const recentMatchesCount = clamp(Number.isFinite(requested) ? requested : 8, 3, 20);
+
+  const career = await repo.getCareerInsightsData(userId, id);
+  if (!career) throw new AppError('Career not found', 404, 'NOT_FOUND');
+
+  const context = buildInsightsContext(career, recentMatchesCount);
+  const raw = await ai.answerCareerQuestion(context, question);
+
+  const fallbackAnswer = typeof raw?.summary === 'string' ? raw.summary.trim() : '';
+  const answer = typeof raw?.answer === 'string' ? raw.answer.trim() : fallbackAnswer;
+  if (!answer) {
+    throw new AppError('AI answer was empty', 502, 'AI_EMPTY_OUTPUT');
+  }
+
+  const confidenceValue = Number(raw?.confidence);
+  return {
+    question,
+    answer,
+    confidence: Number.isFinite(confidenceValue) ? clamp(confidenceValue, 0, 1) : null,
+    recentMatchesConsidered: context.recentWindow.count,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
 module.exports = {
   listCareers,
   createCareer,
@@ -304,4 +333,5 @@ module.exports = {
   deleteCareer,
   activateCareer,
   getPerformanceInsights,
+  askPerformanceInsightsQuestion,
 };

@@ -47,6 +47,16 @@ const getPerformanceInsights = asyncHandler(async (req, res) => {
   return success(res, data, 'Performance insights generated');
 });
 
+const askPerformanceInsightsQuestion = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const body = req.validated?.body || req.body || {};
+  const data = await service.askPerformanceInsightsQuestion(req.user.id, id, {
+    question: body.question,
+    recentMatches: body.recentMatches,
+  });
+  return success(res, data, 'Performance insights question answered');
+});
+
 module.exports = {
   listCareers,
   createCareer,
@@ -55,4 +65,5 @@ module.exports = {
   deleteCareer,
   activateCareer,
   getPerformanceInsights,
+  askPerformanceInsightsQuestion,
 };

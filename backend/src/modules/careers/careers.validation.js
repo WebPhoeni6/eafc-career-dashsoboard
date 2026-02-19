@@ -58,9 +58,19 @@ const careerInsightsSchema = z.object({
   }).optional(),
 });
 
+const careerInsightsQuestionSchema = z.object({
+  body: z.object({
+    question: z.string().min(2).max(300),
+    recentMatches: z.coerce.number().int().min(3).max(20).optional(),
+  }),
+  params: idParams,
+  query: z.object({}).optional(),
+});
+
 module.exports = {
   createCareerSchema,
   updateCareerSchema,
   careerIdSchema,
   careerInsightsSchema,
+  careerInsightsQuestionSchema,
 };

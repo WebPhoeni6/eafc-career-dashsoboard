@@ -11,10 +11,16 @@ import { LineChart } from '../../../components/charts/LineChart';
 import { BarChart } from '../../../components/charts/BarChart';
 import { Select } from '../../../components/ui/Select';
 import { Button } from '../../../components/ui/Button';
+import { Input } from '../../../components/ui/Input';
 import { PageHeader } from '../../../components/shared/PageHeader';
-import { LayoutDashboard, Star, Trophy } from 'lucide-react';
+import { Copy, LayoutDashboard, Star, Trophy } from 'lucide-react';
 import { downloadCareerExport } from '../../../services/api/sync.api';
-import { getCareerPerformanceInsights, type CareerPerformanceInsights } from '../../../services/api/careers.api';
+import {
+  askCareerPerformanceQuestion,
+  getCareerPerformanceInsights,
+  type CareerPerformanceInsights,
+  type CareerPerformanceQuestionResponse,
+} from '../../../services/api/careers.api';
 import { hydrateActiveCareerModules } from '../../../services/api/hydrate';
 import { useToast } from '../../../hooks/useToast';
 import { fmtRating } from '../../../utils/format';
@@ -43,6 +49,9 @@ export const DashboardPage: React.FC = () => {
   const [insightRecentWindow, setInsightRecentWindow] = useState<number>(8);
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [insights, setInsights] = useState<CareerPerformanceInsights | null>(null);
+  const [insightQuestion, setInsightQuestion] = useState('');
+  const [insightQuestionLoading, setInsightQuestionLoading] = useState(false);
+  const [insightFollowUps, setInsightFollowUps] = useState<CareerPerformanceQuestionResponse[]>([]);
 
   const chartMonthOptions = useMemo(() => {
     const months = Array.from(
@@ -124,6 +133,7 @@ export const DashboardPage: React.FC = () => {
       setInsightsLoading(true);
       const data = await getCareerPerformanceInsights(activeCareerId, insightRecentWindow);
       setInsights(data);
+      setInsightFollowUps([]);
       toast('AI analysis ready', 'success');
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {
@@ -150,6 +160,64 @@ export const DashboardPage: React.FC = () => {
       }
     } finally {
       setInsightsLoading(false);
+    }
+  };
+
+  const insightsToClipboardText = (data: CareerPerformanceInsights) => {
+    const lines: string[] = [
+      'AI Performance Insights',
+      '',
+      `Summary: ${data.summary}`,
+      `Momentum: ${data.momentum}`,
+      typeof data.confidence === 'number' ? `Confidence: ${Math.round(data.confidence * 100)}%` : 'Confidence: n/a',
+      `Window: ${data.recentMatchesConsidered} matches`,
+      `Generated: ${fmtDate(data.generatedAt)}`,
+      '',
+      `Strengths: ${data.strengths.join('; ') || 'None identified yet'}`,
+      `Concerns: ${data.concerns.join('; ') || 'No major concerns flagged'}`,
+      `Next Match: ${data.recommendations.nextMatch.join('; ') || 'No suggestions'}`,
+      `Training: ${data.recommendations.training.join('; ') || 'No suggestions'}`,
+      `Season Plan: ${data.recommendations.season.join('; ') || 'No suggestions'}`,
+      `Transfer Strategy: ${data.recommendations.transfers.join('; ') || 'No suggestions'}`,
+      `Metrics To Watch: ${data.keyMetricsToWatch.join('; ') || 'No metrics suggested'}`,
+    ];
+    return lines.join('\n');
+  };
+
+  const copyText = async (text: string) => {
+    if (!text.trim()) {
+      toast('Nothing to copy yet', 'error');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast('Copied', 'success');
+    } catch {
+      toast('Copy failed', 'error');
+    }
+  };
+
+  const handleAskInsightQuestion = async () => {
+    const question = insightQuestion.trim();
+    if (!question) {
+      toast('Type a question first', 'error');
+      return;
+    }
+    if (!activeCareerId) {
+      toast('No active career selected', 'error');
+      return;
+    }
+
+    try {
+      setInsightQuestionLoading(true);
+      const answer = await askCareerPerformanceQuestion(activeCareerId, question, insightRecentWindow);
+      setInsightFollowUps((prev) => [answer, ...prev].slice(0, 6));
+      setInsightQuestion('');
+      toast('Answer ready', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to answer question', 'error');
+    } finally {
+      setInsightQuestionLoading(false);
     }
   };
 
@@ -191,48 +259,6 @@ export const DashboardPage: React.FC = () => {
       {/* KPIs */}
       <KPIGrid kpis={kpis} ratingTrend={form.ratingTrend} />
 
-      {/* Form */}
-      <FormMeter form={form} />
-
-      {/* Charts row */}
-      {card(
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <div style={{ width: '100%', maxWidth: '230px' }}>
-            <Select
-              label="Chart Month"
-              value={chartMonth}
-              onChange={(e) => setChartMonth(e.target.value)}
-              options={chartMonthOptions}
-            />
-          </div>
-        </div>,
-      )}
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
-        {card(<>
-          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>OVR Over Time</div>
-          <LineChart series={charts.ovr} height={180} yMin={40} yMax={99} />
-        </>)}
-        {card(<>
-          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>Goals & Assists Per Match</div>
-          <BarChart series={charts.goalsAssists} height={180} />
-        </>)}
-        {card(<>
-          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>Rating Trend</div>
-          <LineChart series={charts.rating} height={180} yMin={0} yMax={10} />
-        </>)}
-        {card(<>
-          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>G/A per 90 (Rolling)</div>
-          <LineChart series={charts.gaPer90} height={180} />
-        </>)}
-      </div>
-
-      {/* Manager trust trend */}
-      {chartMatches.length > 1 && card(<>
-        <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>Manager Trust Trend</div>
-        <LineChart series={charts.trust} height={140} yMin={0} yMax={4} />
-      </>)}
-
       {/* AI insights */}
       {card(
         <div style={{ display: 'grid', gap: '12px' }}>
@@ -243,7 +269,7 @@ export const DashboardPage: React.FC = () => {
                 Uses recent performances plus full career data for recommendations
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <div style={{ width: '100%', maxWidth: '170px' }}>
                 <Select
                   value={String(insightRecentWindow)}
@@ -258,6 +284,16 @@ export const DashboardPage: React.FC = () => {
               </div>
               <Button type="button" variant="green" size="sm" onClick={() => { void handleGenerateInsights(); }} disabled={insightsLoading}>
                 {insightsLoading ? 'Analyzing...' : insights ? 'Refresh Analysis' : 'Generate Analysis'}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                icon={<Copy size={12} />}
+                onClick={() => { void copyText(insights ? insightsToClipboardText(insights) : ''); }}
+                disabled={!insights}
+              >
+                Copy
               </Button>
             </div>
           </div>
@@ -335,10 +371,103 @@ export const DashboardPage: React.FC = () => {
                   </div>
                 </div>
               )}
+
+              <div style={{ border: '1px solid var(--border-muted)', borderRadius: '12px', padding: '10px', display: 'grid', gap: '10px' }}>
+                <div style={{ fontSize: '12px', fontWeight: 700 }}>Ask Follow-up</div>
+                <div style={{ display: 'grid', gap: '8px' }}>
+                  <Input
+                    value={insightQuestion}
+                    onChange={(e) => setInsightQuestion(e.target.value)}
+                    placeholder="Ask about your form, role fit, training focus, or transfer timing..."
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        void handleAskInsightQuestion();
+                      }
+                    }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <Button type="button" variant="accent" size="sm" onClick={() => { void handleAskInsightQuestion(); }} disabled={insightQuestionLoading}>
+                      {insightQuestionLoading ? 'Asking...' : 'Ask'}
+                    </Button>
+                  </div>
+                </div>
+
+                {insightFollowUps.length > 0 && (
+                  <div style={{ display: 'grid', gap: '8px' }}>
+                    {insightFollowUps.map((item, idx) => (
+                      <div key={`${item.generatedAt}-${idx}`} style={{ border: '1px solid var(--border-muted)', borderRadius: '10px', padding: '9px', display: 'grid', gap: '6px' }}>
+                        <div style={{ fontSize: '12px', color: 'var(--muted)' }}>
+                          Q: {item.question}
+                        </div>
+                        <div style={{ fontSize: '12px', lineHeight: 1.55 }}>{item.answer}</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--muted)' }}>
+                            {typeof item.confidence === 'number' ? `Confidence ${Math.round(item.confidence * 100)}%` : 'Confidence n/a'}
+                            {` • ${fmtDate(item.generatedAt)}`}
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            icon={<Copy size={12} />}
+                            onClick={() => { void copyText(`Q: ${item.question}\n\nA: ${item.answer}`); }}
+                          >
+                            Copy
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>,
       )}
+
+      {/* Form */}
+      <FormMeter form={form} />
+
+      {/* Charts row */}
+      {card(
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ width: '100%', maxWidth: '230px' }}>
+            <Select
+              label="Chart Month"
+              value={chartMonth}
+              onChange={(e) => setChartMonth(e.target.value)}
+              options={chartMonthOptions}
+            />
+          </div>
+        </div>,
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+        {card(<>
+          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>OVR Over Time</div>
+          <LineChart series={charts.ovr} height={180} yMin={40} yMax={99} />
+        </>)}
+        {card(<>
+          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>Goals & Assists Per Match</div>
+          <BarChart series={charts.goalsAssists} height={180} />
+        </>)}
+        {card(<>
+          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>Rating Trend</div>
+          <LineChart series={charts.rating} height={180} yMin={0} yMax={10} />
+        </>)}
+        {card(<>
+          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>G/A per 90 (Rolling)</div>
+          <LineChart series={charts.gaPer90} height={180} />
+        </>)}
+      </div>
+
+      {/* Manager trust trend */}
+      {chartMatches.length > 1 && card(<>
+        <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>Manager Trust Trend</div>
+        <LineChart series={charts.trust} height={140} yMin={0} yMax={4} />
+      </>)}
+
 
       {/* Milestones */}
       {card(<>

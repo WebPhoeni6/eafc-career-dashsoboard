@@ -41,11 +41,16 @@ export const MatchForm: React.FC<MatchFormProps> = ({ initial, prefill, prefillV
   const [v, setV] = useState<MatchFormValues>({ ...defaultMatchValues(), ...initial });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [quickScore, setQuickScore] = useState('');
 
   useEffect(() => {
     if (!prefill) return;
     setV((prev) => ({ ...prev, ...prefill }));
   }, [prefillVersion]);
+
+  useEffect(() => {
+    setQuickScore(`${v.scoreFor}-${v.scoreAgainst}`);
+  }, [v.scoreFor, v.scoreAgainst]);
 
   const set = <K extends keyof MatchFormValues>(field: K, value: MatchFormValues[K]) =>
     setV((prev) => ({ ...prev, [field]: value }));
@@ -53,6 +58,14 @@ export const MatchForm: React.FC<MatchFormProps> = ({ initial, prefill, prefillV
   const applyTemplate = (templateId: string) => {
     const t = MATCH_TEMPLATES.find((x) => x.id === templateId);
     if (t) setV((prev) => ({ ...prev, ...t.defaults }));
+  };
+
+  const applyQuickScore = (raw: string) => {
+    const match = raw.match(/^\s*(\d{1,2})\s*[-:]\s*(\d{1,2})\s*$/);
+    if (!match) return;
+    const scoreFor = Math.max(0, Math.min(30, Number(match[1])));
+    const scoreAgainst = Math.max(0, Math.min(30, Number(match[2])));
+    setV((prev) => ({ ...prev, scoreFor, scoreAgainst }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -102,6 +115,22 @@ export const MatchForm: React.FC<MatchFormProps> = ({ initial, prefill, prefillV
           options={POSITIONS.map((p) => ({ value: p, label: p }))} />
         <Input label="Score (For)" type="number" min={0} max={30} value={v.scoreFor} onChange={(e) => set('scoreFor', Number(e.target.value))} />
         <Input label="Score (Against)" type="number" min={0} max={30} value={v.scoreAgainst} onChange={(e) => set('scoreAgainst', Number(e.target.value))} />
+      </div>
+
+      <div style={g2}>
+        <Input
+          label="Quick Scoreline"
+          value={quickScore}
+          onChange={(e) => setQuickScore(e.target.value)}
+          onBlur={(e) => applyQuickScore(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              applyQuickScore(quickScore);
+            }
+          }}
+          hint="Type like 2-1 (or 2:1), then press Enter"
+        />
       </div>
 
       <div style={g4}>

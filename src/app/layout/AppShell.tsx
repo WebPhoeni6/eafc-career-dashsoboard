@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
@@ -15,6 +15,71 @@ import type { MatchAnalysisResult } from '../../services/api/matches.api';
 import type { Match } from '../../types/match.types';
 
 type MatchDraft = Omit<Match, 'id' | 'createdAt' | 'updatedAt'>;
+const MAX_ANALYSIS_IMAGES = 4;
+const MAX_ANALYSIS_DIMENSION = 1600;
+const MAX_UNCOMPRESSED_BYTES = 1_200_000;
+
+function toMatchSortKey(m: Match): string {
+  return `${m.matchDate || ''}#${m.createdAt || ''}`;
+}
+
+function buildCarryForwardPrefill(matches: Match[]): Partial<MatchDraft> {
+  if (!matches.length) return {};
+  const lastMatch = [...matches].sort((a, b) => toMatchSortKey(b).localeCompare(toMatchSortKey(a)))[0];
+  return {
+    competition: lastMatch.competition,
+    stage: lastMatch.stage,
+    posPlayed: lastMatch.posPlayed,
+    minutesPlayed: lastMatch.minutesPlayed || 90,
+    trust: lastMatch.trust,
+    opponentStrength: lastMatch.opponentStrength,
+  };
+}
+
+function fileSignature(file: File): string {
+  return `${file.name}:${file.size}:${file.lastModified}`;
+}
+
+function analysisCacheKey(files: File[]): string {
+  return files.map(fileSignature).sort().join('|');
+}
+
+async function compressImageForAnalysis(file: File): Promise<File> {
+  if (!file.type.startsWith('image/')) return file;
+  if (file.size <= MAX_UNCOMPRESSED_BYTES || typeof createImageBitmap !== 'function') return file;
+
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_ANALYSIS_DIMENSION / Math.max(bitmap.width, bitmap.height));
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      bitmap.close();
+      return file;
+    }
+
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', 0.82);
+    });
+    if (!blob || blob.size >= file.size * 0.98) return file;
+
+    const baseName = file.name.replace(/\.[^.]+$/, '');
+    return new File([blob], `${baseName}.jpg`, {
+      type: 'image/jpeg',
+      lastModified: file.lastModified,
+    });
+  } catch {
+    return file;
+  }
+}
 
 export const AppShell: React.FC = () => {
   const location = useLocation();
@@ -22,6 +87,8 @@ export const AppShell: React.FC = () => {
   const [newMatchOpen, setNewMatchOpen] = useState(false);
   const [newMatchTab, setNewMatchTab] = useState<'manual' | 'image'>('manual');
   const [analysisFiles, setAnalysisFiles] = useState<File[]>([]);
+  const [processingImages, setProcessingImages] = useState(false);
+  const [compressionStats, setCompressionStats] = useState<{ before: number; after: number } | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<MatchAnalysisResult | null>(null);
   const [matchPrefill, setMatchPrefill] = useState<Partial<MatchDraft> | null>(null);
@@ -35,10 +102,13 @@ export const AppShell: React.FC = () => {
   const toast = useToast((s) => s.show);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const analysisInputRef = useRef<HTMLInputElement | null>(null);
+  const analysisCacheRef = useRef<Map<string, MatchAnalysisResult>>(new Map());
 
   const resetNewMatchState = () => {
     setNewMatchTab('manual');
     setAnalysisFiles([]);
+    setProcessingImages(false);
+    setCompressionStats(null);
     setAnalyzing(false);
     setAnalysisResult(null);
     setMatchPrefill(null);
@@ -46,6 +116,8 @@ export const AppShell: React.FC = () => {
 
   const openNewMatchModal = () => {
     resetNewMatchState();
+    setMatchPrefill(buildCarryForwardPrefill(matches));
+    setPrefillVersion((n) => n + 1);
     setNewMatchOpen(true);
   };
 
@@ -88,11 +160,80 @@ export const AppShell: React.FC = () => {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [activeCareerId, career?.playerName, toast]);
+  }, [activeCareerId, career?.playerName, matches, toast]);
 
   useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname]);
+
+  const processSelectedFiles = useCallback(async (incoming: File[], append = false) => {
+    const picked = incoming.filter((file) => file.type.startsWith('image/')).slice(0, MAX_ANALYSIS_IMAGES);
+    if (!picked.length) {
+      toast('No valid image found', 'error');
+      return;
+    }
+
+    setProcessingImages(true);
+    try {
+      const processed = await Promise.all(picked.map((file) => compressImageForAnalysis(file)));
+      const before = picked.reduce((sum, file) => sum + file.size, 0);
+      const after = processed.reduce((sum, file) => sum + file.size, 0);
+      setCompressionStats(before > after ? { before, after } : null);
+
+      setAnalysisFiles((prev) => {
+        const merged = append ? [...prev, ...processed] : processed;
+        return merged.slice(0, MAX_ANALYSIS_IMAGES);
+      });
+      setAnalysisResult(null);
+    } finally {
+      setProcessingImages(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    if (!newMatchOpen || newMatchTab !== 'image') return;
+
+    const handler = (event: ClipboardEvent) => {
+      const pastedImages = Array.from(event.clipboardData?.files || []).filter((file) =>
+        file.type.startsWith('image/'));
+      if (!pastedImages.length) return;
+      event.preventDefault();
+      void processSelectedFiles(pastedImages, true);
+      toast(`${pastedImages.length} image pasted`, 'success');
+    };
+
+    window.addEventListener('paste', handler);
+    return () => window.removeEventListener('paste', handler);
+  }, [newMatchOpen, newMatchTab, processSelectedFiles, toast]);
+
+  const handlePasteFromClipboard = async () => {
+    if (!navigator.clipboard?.read) {
+      toast('Clipboard image paste is not supported in this browser', 'error');
+      return;
+    }
+
+    try {
+      const items = await navigator.clipboard.read();
+      const pasted: File[] = [];
+      for (const item of items) {
+        const imageType = item.types.find((type) => type.startsWith('image/'));
+        if (!imageType) continue;
+        const blob = await item.getType(imageType);
+        const extension = imageType.includes('png') ? 'png' : imageType.includes('webp') ? 'webp' : 'jpg';
+        pasted.push(new File([blob], `clipboard-${Date.now()}-${pasted.length + 1}.${extension}`, { type: imageType }));
+      }
+
+      if (!pasted.length) {
+        toast('No image found in clipboard', 'error');
+        return;
+      }
+
+      await processSelectedFiles(pasted, true);
+      toast(`${pasted.length} image pasted`, 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not read clipboard image', 'error');
+    }
+  };
 
   const handleAnalyze = async () => {
     if (!analysisFiles.length) {
@@ -100,9 +241,21 @@ export const AppShell: React.FC = () => {
       return;
     }
 
+    const cacheKey = analysisCacheKey(analysisFiles);
+    const cached = analysisCacheRef.current.get(cacheKey);
+    if (cached) {
+      setAnalysisResult(cached);
+      setMatchPrefill(cached.suggested as Partial<MatchDraft>);
+      setPrefillVersion((n) => n + 1);
+      setNewMatchTab('manual');
+      toast('Loaded cached analysis', 'default');
+      return;
+    }
+
     try {
       setAnalyzing(true);
       const result = await analyzePerformanceImages(analysisFiles);
+      analysisCacheRef.current.set(cacheKey, result);
       setAnalysisResult(result);
       setMatchPrefill(result.suggested as Partial<MatchDraft>);
       setPrefillVersion((n) => n + 1);
@@ -178,10 +331,9 @@ export const AppShell: React.FC = () => {
   };
 
   const handleSelectFiles = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []).slice(0, 4);
-    setAnalysisFiles(files);
-    setAnalysisResult(null);
+    const files = Array.from(event.target.files || []);
     event.target.value = '';
+    void processSelectedFiles(files, false);
   };
 
   return (
@@ -217,7 +369,10 @@ export const AppShell: React.FC = () => {
             ) : (
               <div style={{ display: 'grid', gap: '14px' }}>
                 <p style={{ margin: 0, fontSize: '13px', color: 'var(--muted)' }}>
-                  Upload one or more match screenshots. The AI will extract visible fields and prefill the manual form.
+                  Upload screenshots (or paste from clipboard). The AI extracts visible fields and prefills the manual form.
+                </p>
+                <p style={{ margin: 0, fontSize: '12px', color: 'var(--muted)' }}>
+                  Fastest flow: use screenshots from your console/PC, not phone photos.
                 </p>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
@@ -229,13 +384,22 @@ export const AppShell: React.FC = () => {
                     style={{ display: 'none' }}
                     onChange={handleSelectFiles}
                   />
-                  <Button type="button" variant="ghost" size="sm" onClick={() => analysisInputRef.current?.click()}>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => analysisInputRef.current?.click()} disabled={processingImages}>
                     Choose Images
                   </Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => { void handlePasteFromClipboard(); }} disabled={processingImages}>
+                    Paste Screenshot
+                  </Button>
                   <span style={{ fontSize: '12px', color: 'var(--muted)' }}>
-                    Up to 4 images, JPG/PNG/WEBP, 5MB each
+                    Up to 4 images, JPG/PNG/WEBP, 5MB each. Ctrl+V also works in this tab.
                   </span>
                 </div>
+
+                {compressionStats && (
+                  <div style={{ fontSize: '12px', color: 'var(--muted)' }}>
+                    Optimized upload size: {Math.round((compressionStats.before - compressionStats.after) / 1024)}KB saved
+                  </div>
+                )}
 
                 {analysisFiles.length > 0 && (
                   <div style={{ border: '1px solid var(--border-muted)', borderRadius: '12px', padding: '10px' }}>
@@ -243,7 +407,7 @@ export const AppShell: React.FC = () => {
                     <div style={{ display: 'grid', gap: '4px' }}>
                       {analysisFiles.map((file, idx) => (
                         <div key={`${file.name}-${idx}`} style={{ fontSize: '12px' }}>
-                          {idx + 1}. {file.name}
+                          {idx + 1}. {file.name} ({Math.round(file.size / 1024)}KB)
                         </div>
                       ))}
                     </div>
@@ -277,8 +441,8 @@ export const AppShell: React.FC = () => {
                   <Button type="button" variant="ghost" onClick={() => setNewMatchTab('manual')}>
                     Back to Manual Form
                   </Button>
-                  <Button type="button" variant="green" onClick={() => { void handleAnalyze(); }} disabled={analyzing || analysisFiles.length === 0}>
-                    {analyzing ? 'Analyzing...' : 'Analyze and Auto Fill'}
+                  <Button type="button" variant="green" onClick={() => { void handleAnalyze(); }} disabled={processingImages || analyzing || analysisFiles.length === 0}>
+                    {processingImages ? 'Preparing images...' : analyzing ? 'Analyzing...' : 'Analyze and Auto Fill'}
                   </Button>
                 </div>
               </div>

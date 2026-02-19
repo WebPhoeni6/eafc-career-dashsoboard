@@ -103,6 +103,29 @@ function buildPrompt(context) {
   ].join('\n');
 }
 
+function buildQuestionPrompt(context, question) {
+  const cleanQuestion = String(question || '').trim();
+  const playerName = context?.career?.playerName ? String(context.career.playerName).trim() : 'Player';
+
+  return [
+    'You are a personalized performance analyst for an EAFC 26 player career tracker.',
+    'Answer the user question using ONLY the provided career context.',
+    'Return ONLY valid JSON (no markdown) with this shape:',
+    '{',
+    '  "answer": "concise, actionable answer",',
+    '  "confidence": 0.0',
+    '}',
+    'Rules:',
+    `- Address the player as "${playerName}" in second person where natural.`,
+    '- Do not invent facts that are not in context.',
+    '- If data is missing, say exactly what is missing and what to log next.',
+    '- confidence must be a number between 0 and 1.',
+    '',
+    `Question: ${cleanQuestion}`,
+    `Context JSON: ${JSON.stringify(context)}`,
+  ].join('\n');
+}
+
 async function callGemini(prompt) {
   if (!config.GEMINI_API_KEY) return null;
 
@@ -236,6 +259,22 @@ async function analyzeCareerContext(context) {
   throw new AppError('AI analysis is not configured. Set GEMINI_API_KEY in backend/.env', 400, 'AI_NOT_CONFIGURED');
 }
 
+async function answerCareerQuestion(context, question) {
+  if (typeof fetch !== 'function') {
+    throw new AppError('Runtime does not support fetch for AI analysis', 500, 'AI_RUNTIME_ERROR');
+  }
+
+  const prompt = buildQuestionPrompt(context, question);
+  const geminiResult = await callGemini(prompt);
+  if (geminiResult) return geminiResult;
+
+  const openAiResult = await callOpenAI(prompt);
+  if (openAiResult) return openAiResult;
+
+  throw new AppError('AI analysis is not configured. Set GEMINI_API_KEY in backend/.env', 400, 'AI_NOT_CONFIGURED');
+}
+
 module.exports = {
   analyzeCareerContext,
+  answerCareerQuestion,
 };
