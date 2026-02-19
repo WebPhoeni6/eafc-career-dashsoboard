@@ -35,21 +35,128 @@ function extractOutputText(payload) {
   return chunks.join('\n').trim();
 }
 
-function parseJsonFromText(text) {
-  const fenced = text.match(/```json\s*([\s\S]*?)```/i) || text.match(/```\s*([\s\S]*?)```/i);
-  const candidate = (fenced?.[1] || text || '').trim();
+function previewText(text, limit = 320) {
+  return String(text || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, limit);
+}
 
-  try {
-    return JSON.parse(candidate);
-  } catch (_) {
-    const start = candidate.indexOf('{');
-    const end = candidate.lastIndexOf('}');
-    if (start >= 0 && end > start) {
-      return JSON.parse(candidate.slice(start, end + 1));
+function extractBalancedJsonSnippet(text) {
+  const source = String(text || '');
+  const firstObject = source.indexOf('{');
+  const firstArray = source.indexOf('[');
+  let start = -1;
+  if (firstObject >= 0 && firstArray >= 0) start = Math.min(firstObject, firstArray);
+  else start = Math.max(firstObject, firstArray);
+  if (start < 0) return '';
+
+  const stack = [source[start]];
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start + 1; i < source.length; i += 1) {
+    const ch = source[i];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (ch === '\\') {
+        escaped = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (ch === '{' || ch === '[') {
+      stack.push(ch);
+      continue;
+    }
+
+    if (ch === '}' || ch === ']') {
+      const last = stack[stack.length - 1];
+      const isMatch = (last === '{' && ch === '}') || (last === '[' && ch === ']');
+      if (!isMatch) return '';
+
+      stack.pop();
+      if (!stack.length) return source.slice(start, i + 1).trim();
     }
   }
 
-  throw new AppError('AI response could not be parsed as JSON', 502, 'AI_PARSE_ERROR');
+  return '';
+}
+
+function addCandidate(list, raw) {
+  const value = String(raw || '').trim();
+  if (!value) return;
+  if (!list.includes(value)) list.push(value);
+}
+
+function tryParseJson(candidate) {
+  try {
+    return JSON.parse(candidate);
+  } catch (_) {
+    // try a common malformed pattern from LLMs (trailing commas)
+    const cleaned = candidate.replace(/,\s*([}\]])/g, '$1');
+    if (cleaned !== candidate) {
+      return JSON.parse(cleaned);
+    }
+    throw _;
+  }
+}
+
+function parseJsonFromText(text) {
+  const source = String(text || '').replace(/^\uFEFF/, '').trim();
+  const fenced = source.match(/```json\s*([\s\S]*?)```/i) || source.match(/```\s*([\s\S]*?)```/i);
+  const candidate = (fenced?.[1] || source || '').trim().replace(/^json\s*/i, '').trim();
+
+  const candidates = [];
+  addCandidate(candidates, candidate);
+
+  const objectStart = candidate.indexOf('{');
+  const objectEnd = candidate.lastIndexOf('}');
+  if (objectStart >= 0 && objectEnd > objectStart) {
+    addCandidate(candidates, candidate.slice(objectStart, objectEnd + 1));
+  }
+
+  const arrayStart = candidate.indexOf('[');
+  const arrayEnd = candidate.lastIndexOf(']');
+  if (arrayStart >= 0 && arrayEnd > arrayStart) {
+    addCandidate(candidates, candidate.slice(arrayStart, arrayEnd + 1));
+  }
+
+  addCandidate(candidates, extractBalancedJsonSnippet(candidate));
+
+  for (const item of candidates) {
+    try {
+      return tryParseJson(item);
+    } catch (_) {
+      // try next candidate
+    }
+  }
+
+  throw new AppError('AI response could not be parsed as JSON', 502, 'AI_PARSE_ERROR', {
+    preview: previewText(source),
+  });
+}
+
+function summarizeSchemaIssues(error, max = 6) {
+  const issues = Array.isArray(error?.issues) ? error.issues : [];
+  return issues.slice(0, max).map((issue) => ({
+    path: Array.isArray(issue.path) ? issue.path.join('.') : '',
+    message: issue.message,
+    code: issue.code,
+  }));
 }
 
 function extractUpstreamError(rawText, fallbackMessage) {
@@ -152,35 +259,69 @@ async function callGeminiRaw({ systemInstruction, prompt, responseMimeType = 'te
 }
 
 async function runJsonPrompt({ systemInstruction, prompt, schema, fixPromptSuffix = 'Fix JSON only. Return valid JSON only.' }) {
-  const firstText = await callGeminiRaw({
-    systemInstruction,
+  const retryPrompt = [
     prompt,
-    responseMimeType: 'application/json',
-    temperature: 0.15,
-    maxOutputTokens: 2200,
-  });
+    '',
+    'Previous output was invalid for the required schema.',
+    fixPromptSuffix,
+  ].join('\n');
 
-  try {
-    const firstJson = parseJsonFromText(firstText);
-    return schema.parse(firstJson);
-  } catch (_) {
-    const retryPrompt = [
-      prompt,
-      '',
-      'Previous output was invalid for the required schema.',
-      fixPromptSuffix,
-    ].join('\n');
+  const strictRetryPrompt = [
+    retryPrompt,
+    'Return only JSON.',
+    'Do not include markdown code fences.',
+    'Start with "{" and end with "}" (or array brackets if schema requires an array).',
+  ].join('\n');
 
-    const secondText = await callGeminiRaw({
+  const attempts = [
+    { label: 'initial', prompt, temperature: 0.15 },
+    { label: 'repair', prompt: retryPrompt, temperature: 0 },
+    { label: 'strict-repair', prompt: strictRetryPrompt, temperature: 0 },
+  ];
+
+  const diagnostics = [];
+
+  for (const attempt of attempts) {
+    const rawText = await callGeminiRaw({
       systemInstruction,
-      prompt: retryPrompt,
+      prompt: attempt.prompt,
       responseMimeType: 'application/json',
-      temperature: 0,
-      maxOutputTokens: 2200,
+      temperature: attempt.temperature,
+      maxOutputTokens: 3200,
     });
-    const secondJson = parseJsonFromText(secondText);
-    return schema.parse(secondJson);
+
+    let parsed;
+    try {
+      parsed = parseJsonFromText(rawText);
+    } catch (err) {
+      diagnostics.push({
+        attempt: attempt.label,
+        stage: 'parse',
+        message: err instanceof Error ? err.message : 'JSON parse failed',
+        preview: previewText(rawText),
+      });
+      continue;
+    }
+
+    const validated = schema.safeParse(parsed);
+    if (validated.success) return validated.data;
+
+    diagnostics.push({
+      attempt: attempt.label,
+      stage: 'schema',
+      message: 'JSON did not match expected schema',
+      issues: summarizeSchemaIssues(validated.error),
+      preview: previewText(JSON.stringify(parsed)),
+    });
   }
+
+  const hasSchemaError = diagnostics.some((item) => item.stage === 'schema');
+  throw new AppError(
+    hasSchemaError ? 'AI response did not match required JSON schema' : 'AI response could not be parsed as JSON',
+    502,
+    hasSchemaError ? 'AI_SCHEMA_ERROR' : 'AI_PARSE_ERROR',
+    { attempts: diagnostics },
+  );
 }
 
 module.exports = {
