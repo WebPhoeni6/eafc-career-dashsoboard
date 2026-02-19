@@ -2,6 +2,8 @@ const { z } = require('zod');
 
 const positionEnum = z.enum(['GK', 'CB', 'LB', 'RB', 'CDM', 'CM', 'CAM', 'LW', 'RW', 'CF', 'ST']);
 const preferredFootEnum = z.enum(['Left', 'Right']);
+const toneEnum = z.enum(['Supportive', 'Balanced', 'Harsh']);
+const focusEnum = z.enum(['UCL', 'Domestic', 'Development', 'Transfers', 'Mentality']);
 
 const careerPayload = z.object({
   saveName: z.string().min(1).max(80),
@@ -67,10 +69,42 @@ const careerInsightsQuestionSchema = z.object({
   query: z.object({}).optional(),
 });
 
+const careerDirectorReportSchema = z.object({
+  body: z.object({
+    recentMatches: z.coerce.number().int().min(3).max(30).optional(),
+    wholeCareer: z.boolean().optional(),
+    tone: toneEnum.optional(),
+    focus: focusEnum.optional(),
+  }).optional(),
+  params: idParams,
+  query: z.object({}).optional(),
+});
+
+const careerDirectorChatSchema = z.object({
+  body: z.object({
+    message: z.string().min(1).max(600),
+    recentMatches: z.coerce.number().int().min(3).max(30).optional(),
+    wholeCareer: z.boolean().optional(),
+    tone: toneEnum.optional(),
+    focus: focusEnum.optional(),
+  }),
+  params: idParams,
+  query: z.object({}).optional(),
+});
+
+const careerDirectorHistorySchema = z.object({
+  body: z.object({}).optional(),
+  params: idParams,
+  query: z.object({}).optional(),
+});
+
 module.exports = {
   createCareerSchema,
   updateCareerSchema,
   careerIdSchema,
   careerInsightsSchema,
   careerInsightsQuestionSchema,
+  careerDirectorReportSchema,
+  careerDirectorChatSchema,
+  careerDirectorHistorySchema,
 };

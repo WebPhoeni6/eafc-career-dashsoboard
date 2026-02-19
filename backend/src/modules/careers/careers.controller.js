@@ -1,6 +1,7 @@
 const { success } = require('../../utils/response');
 const { asyncHandler } = require('../../middlewares/error');
 const service = require('./careers.service');
+const careerDirectorService = require('./careerDirector.service');
 
 const listCareers = asyncHandler(async (req, res) => {
   const data = await service.listCareers(req.user.id);
@@ -57,6 +58,37 @@ const askPerformanceInsightsQuestion = asyncHandler(async (req, res) => {
   return success(res, data, 'Performance insights question answered');
 });
 
+const generateCareerDirectorReport = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const body = req.validated?.body || req.body || {};
+  const data = await careerDirectorService.generateCareerDirectorReport(req.user.id, id, {
+    recentMatches: body.recentMatches,
+    wholeCareer: body.wholeCareer,
+    tone: body.tone,
+    focus: body.focus,
+  });
+  return success(res, data, 'Career Director report generated');
+});
+
+const chatCareerDirector = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const body = req.validated?.body || req.body || {};
+  const data = await careerDirectorService.chatCareerDirector(req.user.id, id, {
+    message: body.message,
+    recentMatches: body.recentMatches,
+    wholeCareer: body.wholeCareer,
+    tone: body.tone,
+    focus: body.focus,
+  });
+  return success(res, data, 'Career Director chat response generated');
+});
+
+const getCareerDirectorHistory = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const data = await careerDirectorService.getCareerDirectorHistory(req.user.id, id);
+  return success(res, data, 'Career Director history loaded');
+});
+
 module.exports = {
   listCareers,
   createCareer,
@@ -66,4 +98,7 @@ module.exports = {
   activateCareer,
   getPerformanceInsights,
   askPerformanceInsightsQuestion,
+  generateCareerDirectorReport,
+  chatCareerDirector,
+  getCareerDirectorHistory,
 };
