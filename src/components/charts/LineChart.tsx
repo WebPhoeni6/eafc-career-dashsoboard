@@ -32,9 +32,9 @@ export const LineChart: React.FC<LineChartProps> = ({ series, title, height = 20
       borderColor: ds.color ?? '#7c5cff',
       backgroundColor: (ds.color ?? '#7c5cff') + '22',
       pointBackgroundColor: ds.color ?? '#7c5cff',
-      pointRadius: 3,
+      pointRadius: series.labels.length > 20 ? 1.5 : 3,
       tension: 0.35,
-      fill: true,
+      fill: series.datasets.length === 1,
     })),
   };
 

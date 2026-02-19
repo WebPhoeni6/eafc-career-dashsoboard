@@ -38,6 +38,10 @@ function toFrontendMatch(item) {
 function toDbPayload(input) {
   const payload = { ...input };
   if ('stage' in payload) payload.stage = stageToEnum(payload.stage);
+  if ('matchDate' in payload && payload.matchDate) {
+    const normalized = normalizeDate(payload.matchDate);
+    if (normalized) payload.matchDate = normalized;
+  }
   if ('ovrAfter' in payload) payload.ovrAfter = emptyStringToNull(payload.ovrAfter);
   if ('spAfter' in payload) payload.spAfter = emptyStringToNull(payload.spAfter);
   if ('performanceImageUrl' in payload && payload.performanceImageUrl === '') payload.performanceImageUrl = null;

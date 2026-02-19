@@ -42,6 +42,22 @@ function asTextList(value, maxItems = 6) {
     .slice(0, maxItems);
 }
 
+function asMilestoneSuggestions(value, maxItems = 4) {
+  if (!Array.isArray(value)) return [];
+  const out = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue;
+    const label = typeof item.label === 'string' ? item.label.trim() : '';
+    const unit = typeof item.unit === 'string' ? item.unit.trim() : '';
+    const targetRaw = Number(item.target);
+    const target = Number.isFinite(targetRaw) ? Math.round(targetRaw) : 0;
+    if (!label || !unit || target <= 0) continue;
+    out.push({ label, unit, target: clamp(target, 1, 500) });
+    if (out.length >= maxItems) break;
+  }
+  return out;
+}
+
 function buildInsightsContext(career, recentMatchesCount) {
   const allMatches = sortMatchesByDateAsc(safeArray(career.matches));
   const recentMatches = allMatches.slice(-recentMatchesCount);
@@ -289,6 +305,7 @@ async function getPerformanceInsights(userId, id, options = {}) {
       season: asTextList(recommendations.season, 6),
       transfers: asTextList(recommendations.transfers, 6),
     },
+    milestoneSuggestions: asMilestoneSuggestions(raw?.milestoneSuggestions, 4),
     keyMetricsToWatch: asTextList(raw?.keyMetricsToWatch, 8),
     recentFormSnapshot: typeof raw?.recentFormSnapshot === 'string' ? raw.recentFormSnapshot.trim() : '',
     recentMatchesConsidered: context.recentWindow.count,

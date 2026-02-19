@@ -32,6 +32,21 @@ export interface Contract {
   notes: string;
 }
 
+export interface ContractCreateInput {
+  club: string;
+  league: string;
+  startSeason: string;
+  endSeason?: string;
+  apps?: number;
+  goals?: number;
+  assists?: number;
+  avgRating?: number;
+  trophies?: string[];
+  notes?: string;
+}
+
+export type ContractUpdateInput = Partial<Omit<Contract, 'id'>>;
+
 export interface AgentNote {
   id: string;
   date: string;

@@ -85,6 +85,7 @@ function buildPrompt(context) {
     '    "season": ["..."],',
     '    "transfers": ["..."]',
     '  },',
+    '  "milestoneSuggestions": [{ "label": "...", "target": 10, "unit": "goals" }],',
     '  "keyMetricsToWatch": ["..."],',
     '  "recentFormSnapshot": "short recent-form summary"',
     '}',
@@ -98,6 +99,7 @@ function buildPrompt(context) {
     '- For transfer strategy, prioritize fit signals available in context: club, role, status, hasUCL, score, contract period, and historical output (apps/goals/assists).',
     '- If transfer data is sparse, say that clearly and give low-risk next steps for logging better offers/contracts.',
     '- Keep transfer advice grounded in the player path from the current club (' + club + ') and recent form.',
+    '- milestoneSuggestions should contain 0 to 4 realistic, trackable targets with numeric target values.',
     '',
     `Context JSON: ${JSON.stringify(context)}`,
   ].join('\n');

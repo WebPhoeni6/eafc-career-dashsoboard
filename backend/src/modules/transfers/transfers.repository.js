@@ -10,6 +10,7 @@ const offer = {
 const contract = {
   list: (careerId) => prisma.contract.findMany({ where: { careerId }, orderBy: { createdAt: 'desc' } }),
   create: (data) => prisma.contract.create({ data }),
+  update: (careerId, id, data) => prisma.contract.updateMany({ where: { id, careerId }, data }),
   remove: (careerId, id) => prisma.contract.deleteMany({ where: { id, careerId } }),
 };
 

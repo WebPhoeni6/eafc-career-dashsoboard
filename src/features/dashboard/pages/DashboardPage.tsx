@@ -8,12 +8,11 @@ import { KPIGrid } from '../components/KPIGrid';
 import { FormMeter } from '../components/FormMeter';
 import { QuickActions } from '../components/QuickActions';
 import { LineChart } from '../../../components/charts/LineChart';
-import { BarChart } from '../../../components/charts/BarChart';
 import { Select } from '../../../components/ui/Select';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { PageHeader } from '../../../components/shared/PageHeader';
-import { Copy, LayoutDashboard, Star, Trophy } from 'lucide-react';
+import { Copy, EyeOff, LayoutDashboard, PlusCircle, Star, Trash2, Trophy } from 'lucide-react';
 import { downloadCareerExport } from '../../../services/api/sync.api';
 import {
   askCareerPerformanceQuestion,
@@ -23,21 +22,25 @@ import {
 } from '../../../services/api/careers.api';
 import { hydrateActiveCareerModules } from '../../../services/api/hydrate';
 import { useToast } from '../../../hooks/useToast';
+import { useLocalStorage } from '../../../hooks/useLocalStorage';
 import { fmtRating } from '../../../utils/format';
-import { fmtDate, fmtMonth } from '../../../utils/date';
+import { fmtDate } from '../../../utils/date';
 import { ApiError } from '../../../services/api/types';
 
 type SortDirection = 'asc' | 'desc';
 type CompSortKey = 'competition' | 'apps' | 'goals' | 'assists' | 'avgRating';
 type PosSortKey = 'position' | 'apps' | 'goals' | 'assists' | 'avgRating';
+type ChartRange = 'LAST_3M' | 'LAST_6M' | 'LAST_12M';
 
 export const DashboardPage: React.FC = () => {
   const { career, achievements, activeCareerId, loadCareers } = useCareerStore();
   const matches = useMatchesStore((s) => s.matches);
-  const { trophies } = useSeasonsStore();
+  const trophies = useSeasonsStore((s) => s.trophies);
+  const challenges = useSeasonsStore((s) => s.challenges);
+  const addChallenge = useSeasonsStore((s) => s.addChallenge);
   const toast = useToast((s) => s.show);
   const context = useOutletContext<{ openNewMatch: () => void } | null>();
-  const [chartMonth, setChartMonth] = useState<string>('ALL');
+  const [chartRange, setChartRange] = useState<ChartRange>('LAST_6M');
   const [compSort, setCompSort] = useState<{ key: CompSortKey; direction: SortDirection }>({
     key: 'apps',
     direction: 'desc',
@@ -52,29 +55,41 @@ export const DashboardPage: React.FC = () => {
   const [insightQuestion, setInsightQuestion] = useState('');
   const [insightQuestionLoading, setInsightQuestionLoading] = useState(false);
   const [insightFollowUps, setInsightFollowUps] = useState<CareerPerformanceQuestionResponse[]>([]);
+  const [addingMilestoneLabel, setAddingMilestoneLabel] = useState<string | null>(null);
+  const [hiddenCompletedMilestones, setHiddenCompletedMilestones] = useLocalStorage<string[]>(
+    'dashboard.hidden.completed.milestones.v1',
+    [],
+  );
 
-  const chartMonthOptions = useMemo(() => {
-    const months = Array.from(
-      new Set(
-        matches
-          .map((m) => (typeof m.matchDate === 'string' ? m.matchDate.slice(0, 7) : ''))
-          .filter((ym) => /^\d{4}-\d{2}$/.test(ym)),
-      ),
-    ).sort((a, b) => b.localeCompare(a));
-
-    return [
-      { value: 'ALL', label: 'All months' },
-      ...months.map((ym) => ({ value: ym, label: fmtMonth(ym) })),
-    ];
-  }, [matches]);
+  const chartRangeOptions = useMemo(
+    () => [
+      { value: 'LAST_3M', label: 'Last 3 months' },
+      { value: 'LAST_6M', label: 'Last 6 months' },
+      { value: 'LAST_12M', label: 'Last year' },
+    ],
+    [],
+  );
 
   const chartMatches = useMemo(() => {
-    if (chartMonth === 'ALL') return matches;
-    return matches.filter((m) => typeof m.matchDate === 'string' && m.matchDate.startsWith(chartMonth));
-  }, [matches, chartMonth]);
+    const now = new Date();
+    const cutoff = new Date(now);
+    if (chartRange === 'LAST_3M') cutoff.setMonth(cutoff.getMonth() - 3);
+    if (chartRange === 'LAST_6M') cutoff.setMonth(cutoff.getMonth() - 6);
+    if (chartRange === 'LAST_12M') cutoff.setFullYear(cutoff.getFullYear() - 1);
+
+    const filtered = matches.filter((m) => {
+      if (!m.matchDate) return false;
+      const parsed = new Date(m.matchDate);
+      if (Number.isNaN(parsed.getTime())) return false;
+      return parsed >= cutoff && parsed <= now;
+    });
+    return filtered.length ? filtered : matches;
+  }, [matches, chartRange]);
 
   const data = getDashboardData(matches, career, chartMatches);
   const { kpis, form, compSplits, posSplits, bigGamePerformer, milestones, charts } = data;
+  const visibleMilestones = milestones.filter((m) => !(m.reached && hiddenCompletedMilestones.includes(m.key)));
+  const challengeLabels = new Set(challenges.map((c) => c.label.trim().toLowerCase()));
 
   const sortedCompSplits = useMemo(() => {
     const dir = compSort.direction === 'asc' ? 1 : -1;
@@ -179,6 +194,7 @@ export const DashboardPage: React.FC = () => {
       `Training: ${data.recommendations.training.join('; ') || 'No suggestions'}`,
       `Season Plan: ${data.recommendations.season.join('; ') || 'No suggestions'}`,
       `Transfer Strategy: ${data.recommendations.transfers.join('; ') || 'No suggestions'}`,
+      `Milestone Suggestions: ${(Array.isArray(data.milestoneSuggestions) ? data.milestoneSuggestions : []).map((s) => `${s.label} (${s.target} ${s.unit})`).join('; ') || 'No suggestions'}`,
       `Metrics To Watch: ${data.keyMetricsToWatch.join('; ') || 'No metrics suggested'}`,
     ];
     return lines.join('\n');
@@ -219,6 +235,39 @@ export const DashboardPage: React.FC = () => {
     } finally {
       setInsightQuestionLoading(false);
     }
+  };
+
+  const handleAddAiMilestone = async (suggestion: { label: string; target: number; unit: string }) => {
+    const normalizedLabel = suggestion.label.trim().toLowerCase();
+    if (!career) {
+      toast('Set up your career profile first', 'error');
+      return;
+    }
+    if (challengeLabels.has(normalizedLabel)) {
+      toast('Milestone already exists', 'default');
+      return;
+    }
+
+    try {
+      setAddingMilestoneLabel(suggestion.label);
+      await addChallenge({
+        season: career.season,
+        label: suggestion.label.trim(),
+        target: Math.max(1, Math.round(suggestion.target)),
+        current: 0,
+        unit: suggestion.unit.trim() || 'goals',
+        completed: false,
+      });
+      toast('Milestone added', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to add milestone', 'error');
+    } finally {
+      setAddingMilestoneLabel(null);
+    }
+  };
+
+  const hideCompletedMilestone = (key: string) => {
+    setHiddenCompletedMilestones((prev) => (prev.includes(key) ? prev : [...prev, key]));
   };
 
   const card = (children: React.ReactNode, style?: React.CSSProperties) => (
@@ -372,6 +421,37 @@ export const DashboardPage: React.FC = () => {
                 </div>
               )}
 
+              {(Array.isArray(insights.milestoneSuggestions) ? insights.milestoneSuggestions.length : 0) > 0 && (
+                <div style={{ border: '1px solid var(--border-muted)', borderRadius: '12px', padding: '10px', display: 'grid', gap: '8px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700 }}>AI Milestone Suggestions</div>
+                  <div style={{ display: 'grid', gap: '8px' }}>
+                    {(Array.isArray(insights.milestoneSuggestions) ? insights.milestoneSuggestions : []).map((s, idx) => {
+                      const exists = challengeLabels.has(s.label.trim().toLowerCase());
+                      const adding = addingMilestoneLabel === s.label;
+                      return (
+                        <div key={`${s.label}-${idx}`} style={{ border: '1px solid var(--border-muted)', borderRadius: '10px', padding: '9px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <div style={{ fontSize: '12px', color: 'var(--muted)' }}>
+                            <strong style={{ color: 'var(--text)' }}>{s.label}</strong> - Target {s.target} {s.unit}
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            icon={<PlusCircle size={12} />}
+                            disabled={exists || adding}
+                            onClick={() => {
+                              void handleAddAiMilestone(s);
+                            }}
+                          >
+                            {exists ? 'Added' : adding ? 'Adding...' : 'Set as Milestone'}
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div style={{ border: '1px solid var(--border-muted)', borderRadius: '12px', padding: '10px', display: 'grid', gap: '10px' }}>
                 <div style={{ fontSize: '12px', fontWeight: 700 }}>Ask Follow-up</div>
                 <div style={{ display: 'grid', gap: '8px' }}>
@@ -431,36 +511,38 @@ export const DashboardPage: React.FC = () => {
 
       {/* Charts row */}
       {card(
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <div style={{ width: '100%', maxWidth: '230px' }}>
-            <Select
-              label="Chart Month"
-              value={chartMonth}
-              onChange={(e) => setChartMonth(e.target.value)}
-              options={chartMonthOptions}
-            />
+        <div style={{ display: 'grid', gap: '14px' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ width: '100%', maxWidth: '230px' }}>
+              <Select
+                label="Chart Window"
+                value={chartRange}
+                onChange={(e) => setChartRange(e.target.value as ChartRange)}
+                options={chartRangeOptions}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '14px' }}>
+            {card(<>
+              <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>OVR Over Time</div>
+              <LineChart series={charts.ovr} height={180} yMin={40} yMax={99} />
+            </>)}
+            {card(<>
+              <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>Goals & Assists Per Match</div>
+              <LineChart series={charts.goalsAssists} height={180} yMin={0} />
+            </>)}
+            {card(<>
+              <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>Rating Trend</div>
+              <LineChart series={charts.rating} height={180} yMin={0} yMax={10} />
+            </>)}
+            {card(<>
+              <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>G/A per 90 (Rolling)</div>
+              <LineChart series={charts.gaPer90} height={180} />
+            </>)}
           </div>
         </div>,
       )}
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
-        {card(<>
-          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>OVR Over Time</div>
-          <LineChart series={charts.ovr} height={180} yMin={40} yMax={99} />
-        </>)}
-        {card(<>
-          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>Goals & Assists Per Match</div>
-          <BarChart series={charts.goalsAssists} height={180} />
-        </>)}
-        {card(<>
-          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>Rating Trend</div>
-          <LineChart series={charts.rating} height={180} yMin={0} yMax={10} />
-        </>)}
-        {card(<>
-          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>G/A per 90 (Rolling)</div>
-          <LineChart series={charts.gaPer90} height={180} />
-        </>)}
-      </div>
 
       {/* Manager trust trend */}
       {chartMatches.length > 1 && card(<>
@@ -471,17 +553,42 @@ export const DashboardPage: React.FC = () => {
 
       {/* Milestones */}
       {card(<>
-        <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Trophy size={16} style={{ color: 'var(--warning)' }} /> Milestones
+        <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Trophy size={16} style={{ color: 'var(--warning)' }} /> Milestones
+          </span>
+          {hiddenCompletedMilestones.length > 0 && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              icon={<Trash2 size={12} />}
+              onClick={() => setHiddenCompletedMilestones([])}
+            >
+              Show Hidden ({hiddenCompletedMilestones.length})
+            </Button>
+          )}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '10px' }}>
-          {milestones.map((m) => {
+          {visibleMilestones.map((m) => {
             const pct = Math.min(100, (m.current / m.target) * 100);
             return (
               <div key={m.key} style={{ padding: '12px', borderRadius: '12px', background: m.reached ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.02)', border: `1px solid ${m.reached ? 'rgba(34,197,94,0.3)' : 'rgba(34,48,74,0.6)'}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                   <span style={{ fontSize: '12px', fontWeight: 600 }}>{m.label}</span>
-                  {m.reached && <span style={{ fontSize: '12px' }}>✅</span>}
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {m.reached && <span style={{ fontSize: '12px' }}>✅</span>}
+                    {m.reached && (
+                      <button
+                        type="button"
+                        onClick={() => hideCompletedMilestone(m.key)}
+                        title="Hide completed milestone"
+                        style={{ border: 'none', background: 'transparent', color: 'var(--muted)', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center' }}
+                      >
+                        <EyeOff size={12} />
+                      </button>
+                    )}
+                  </span>
                 </div>
                 <div style={{ height: '5px', borderRadius: '3px', background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
                   <div style={{ width: `${pct}%`, height: '100%', background: m.reached ? '#22c55e' : '#7c5cff', borderRadius: '3px', transition: 'width 0.4s ease' }} />
@@ -490,6 +597,11 @@ export const DashboardPage: React.FC = () => {
               </div>
             );
           })}
+          {visibleMilestones.length === 0 && (
+            <div style={{ fontSize: '12px', color: 'var(--muted)' }}>
+              No milestones visible.
+            </div>
+          )}
         </div>
       </>)}
 

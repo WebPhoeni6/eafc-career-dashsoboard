@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { TransferOffer, Contract, AgentNote } from '../types/transfer.types';
+import type { TransferOffer, Contract, AgentNote, ContractCreateInput, ContractUpdateInput } from '../types/transfer.types';
 import * as transfersApi from '../services/api/transfers.api';
 import { useCareerStore } from './career.store';
 import { nowISO } from '../utils/date';
@@ -13,7 +13,8 @@ interface TransfersState {
   addOffer: (o: Omit<TransferOffer, 'id' | 'createdAt'>) => Promise<void>;
   updateOffer: (id: string, o: Partial<TransferOffer>) => Promise<void>;
   deleteOffer: (id: string) => Promise<void>;
-  addContract: (c: Omit<Contract, 'id'>) => Promise<void>;
+  addContract: (c: ContractCreateInput) => Promise<void>;
+  updateContract: (id: string, c: ContractUpdateInput) => Promise<void>;
   deleteContract: (id: string) => Promise<void>;
   addAgentNote: (n: Omit<AgentNote, 'id' | 'createdAt'>) => Promise<void>;
   deleteAgentNote: (id: string) => Promise<void>;
@@ -63,6 +64,12 @@ export const useTransfersStore = create<TransfersState>()((set) => ({
     const careerId = getCareerId();
     const created = await transfersApi.createContract(careerId, contract);
     set((state) => ({ contracts: [...state.contracts, created] }));
+  },
+
+  updateContract: async (id, contract) => {
+    const careerId = getCareerId();
+    const updated = await transfersApi.updateContract(careerId, id, contract);
+    set((state) => ({ contracts: state.contracts.map((item) => (item.id === id ? updated : item)) }));
   },
 
   deleteContract: async (id) => {

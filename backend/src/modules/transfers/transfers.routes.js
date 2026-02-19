@@ -8,6 +8,7 @@ const {
   createOfferSchema,
   updateOfferSchema,
   createContractSchema,
+  updateContractSchema,
   createAgentNoteSchema,
 } = require('./transfers.validation');
 
@@ -29,6 +30,7 @@ router.delete('/offers/:id', validate(byCareerAndIdSchema), controller.deleteOff
 
 router.get('/contracts', validate(byCareerSchema), controller.listContracts);
 router.post('/contracts', validate(createContractSchema), controller.createContract);
+router.patch('/contracts/:id', validate(updateContractSchema), controller.updateContract);
 router.delete('/contracts/:id', validate(byCareerAndIdSchema), controller.deleteContract);
 
 router.get('/agent-notes', validate(byCareerSchema), controller.listAgentNotes);

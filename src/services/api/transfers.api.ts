@@ -1,4 +1,4 @@
-import type { AgentNote, Contract, TransferOffer } from '../../types/transfer.types';
+import type { AgentNote, Contract, ContractCreateInput, ContractUpdateInput, TransferOffer } from '../../types/transfer.types';
 import { request } from './http';
 
 export async function listOffers(careerId: string): Promise<TransferOffer[]> {
@@ -36,9 +36,16 @@ export async function listContracts(careerId: string): Promise<Contract[]> {
   return request(`/api/careers/${careerId}/contracts`);
 }
 
-export async function createContract(careerId: string, payload: Omit<Contract, 'id'>): Promise<Contract> {
+export async function createContract(careerId: string, payload: ContractCreateInput): Promise<Contract> {
   return request(`/api/careers/${careerId}/contracts`, {
     method: 'POST',
+    body: payload,
+  });
+}
+
+export async function updateContract(careerId: string, id: string, payload: ContractUpdateInput): Promise<Contract> {
+  return request(`/api/careers/${careerId}/contracts/${id}`, {
+    method: 'PATCH',
     body: payload,
   });
 }

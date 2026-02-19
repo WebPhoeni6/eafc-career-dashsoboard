@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTransfersStore } from '../../../store/transfers.store';
 import { PageHeader } from '../../../components/shared/PageHeader';
 import { Button } from '../../../components/ui/Button';
@@ -7,7 +7,7 @@ import { Input } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
 import { Textarea } from '../../../components/ui/Textarea';
 import { Tabs } from '../../../components/ui/Tabs';
-import { ArrowLeftRight, PlusCircle, Trash2 } from 'lucide-react';
+import { ArrowLeftRight, Check, PlusCircle, Trash2, X } from 'lucide-react';
 import { fmtDate, todayISO } from '../../../utils/date';
 import { useToast } from '../../../hooks/useToast';
 import type { TransferOffer, Contract } from '../../../types/transfer.types';
@@ -78,6 +78,7 @@ export const TransfersPage: React.FC = () => {
     updateOffer,
     deleteOffer,
     addContract,
+    updateContract,
     deleteContract,
     addAgentNote,
     deleteAgentNote,
@@ -88,6 +89,11 @@ export const TransfersPage: React.FC = () => {
   const [offerForm, setOfferForm] = useState(false);
   const [noteForm, setNoteForm] = useState(false);
   const [contractForm, setContractForm] = useState(false);
+  const [closeContractForm, setCloseContractForm] = useState(false);
+  const [compactOfferActions, setCompactOfferActions] = useState<boolean>(
+    typeof window !== 'undefined' ? window.innerWidth <= 760 : false,
+  );
+  const [closingContract, setClosingContract] = useState<Contract | null>(null);
 
   const [ov, setOv] = useState(defaultOffer());
   const [contractObjectives, setContractObjectives] = useState('');
@@ -97,16 +103,19 @@ export const TransfersPage: React.FC = () => {
   const [noteContent, setNoteContent] = useState('');
   const [noteTag, setNoteTag] = useState<'Strategy' | 'Rumor' | 'Goal' | 'Warning' | 'Other'>('Strategy');
 
-  const [cv, setCv] = useState<Omit<Contract, 'id'>>({
+  const [cv, setCv] = useState({
     club: '',
     league: '',
     startSeason: '',
+    notes: '',
+  });
+
+  const [closeCv, setCloseCv] = useState({
     endSeason: '',
     apps: 0,
     goals: 0,
     assists: 0,
     avgRating: 0,
-    trophies: [],
     notes: '',
   });
 
@@ -129,6 +138,25 @@ export const TransfersPage: React.FC = () => {
       {children}
     </div>
   );
+
+  useEffect(() => {
+    const onResize = () => setCompactOfferActions(window.innerWidth <= 760);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const openCloseContractModal = (contract: Contract) => {
+    setClosingContract(contract);
+    setCloseCv({
+      endSeason: contract.endSeason === 'Active' ? '' : contract.endSeason,
+      apps: contract.apps,
+      goals: contract.goals,
+      assists: contract.assists,
+      avgRating: contract.avgRating,
+      notes: contract.notes,
+    });
+    setCloseContractForm(true);
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
@@ -183,9 +211,10 @@ export const TransfersPage: React.FC = () => {
                               display: 'flex',
                               gap: '16px',
                               alignItems: 'flex-start',
+                              flexWrap: 'wrap',
                             }}
                           >
-                            <div style={{ flex: 1 }}>
+                            <div style={{ flex: '1 1 260px', minWidth: 0 }}>
                               <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '6px' }}>
                                 <span style={{ fontWeight: 700, fontSize: '14px' }}>{o.club}</span>
                                 <span style={{ fontSize: '12px', color: 'var(--muted)' }}>
@@ -208,7 +237,7 @@ export const TransfersPage: React.FC = () => {
                                 <span style={{ fontSize: '11px', color: statusColor[o.status] }}>{o.status}</span>
                               </div>
 
-                              <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'var(--muted)' }}>
+                              <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'var(--muted)', flexWrap: 'wrap' }}>
                                 <span>
                                   Role: <strong style={{ color: 'var(--text)' }}>{o.role}</strong>
                                 </span>
@@ -240,26 +269,34 @@ export const TransfersPage: React.FC = () => {
                               )}
                             </div>
 
-                            <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                              <Button
-                                size="sm"
-                                variant="green"
-                                onClick={() => {
-                                  updateOffer(o.id, { status: 'Accepted' });
-                                  toast('Offer accepted', 'success');
-                                }}
-                              >
-                                Accept
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="danger"
-                                onClick={() => {
-                                  updateOffer(o.id, { status: 'Rejected' });
-                                }}
-                              >
-                                Reject
-                              </Button>
+                            <div style={{ display: 'flex', gap: '6px', flexShrink: 0, marginLeft: 'auto', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                              {o.status === 'Pending' && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="green"
+                                    onClick={() => {
+                                      updateOffer(o.id, { status: 'Accepted' });
+                                      toast('Offer accepted', 'success');
+                                    }}
+                                    icon={compactOfferActions ? <Check size={12} /> : undefined}
+                                    title="Accept offer"
+                                  >
+                                    {compactOfferActions ? '' : 'Accept'}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="danger"
+                                    onClick={() => {
+                                      updateOffer(o.id, { status: 'Rejected' });
+                                    }}
+                                    icon={compactOfferActions ? <X size={12} /> : undefined}
+                                    title="Reject offer"
+                                  >
+                                    {compactOfferActions ? '' : 'Reject'}
+                                  </Button>
+                                </>
+                              )}
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -300,16 +337,32 @@ export const TransfersPage: React.FC = () => {
                       <tbody>
                         {contracts.map((c) => (
                           <tr key={c.id} style={{ borderTop: '1px solid var(--border-muted)' }}>
-                            <td style={{ padding: '7px 8px', fontWeight: 600 }}>{c.club}</td>
+                            <td style={{ padding: '7px 8px', fontWeight: 600 }}>
+                              {c.club}
+                              {c.endSeason === 'Active' && (
+                                <span style={{ marginLeft: '6px', fontSize: '10px', color: '#22c55e', border: '1px solid rgba(34,197,94,0.35)', borderRadius: '999px', padding: '1px 6px' }}>
+                                  ACTIVE
+                                </span>
+                              )}
+                            </td>
                             <td style={{ textAlign: 'center' }}>{c.league}</td>
                             <td style={{ textAlign: 'center', color: 'var(--muted)' }}>
-                              {c.startSeason}-{c.endSeason}
+                              {c.endSeason === 'Active' ? `${c.startSeason} - Present` : `${c.startSeason}-${c.endSeason}`}
                             </td>
                             <td style={{ textAlign: 'center' }}>{c.apps}</td>
                             <td style={{ textAlign: 'center', color: '#22c55e', fontWeight: 700 }}>{c.goals}</td>
                             <td style={{ textAlign: 'center', color: '#7c5cff', fontWeight: 700 }}>{c.assists}</td>
                             <td style={{ textAlign: 'center', color: '#f59e0b' }}>{c.avgRating.toFixed(1)}</td>
-                            <td>
+                            <td style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                              {c.endSeason === 'Active' && (
+                                <Button
+                                  size="sm"
+                                  variant="green"
+                                  onClick={() => openCloseContractModal(c)}
+                                >
+                                  Close
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -550,7 +603,7 @@ export const TransfersPage: React.FC = () => {
       <Modal
         open={contractForm}
         onClose={() => setContractForm(false)}
-        title="Log Contract"
+        title="Log New Contract (Start)"
         width="560px"
         actions={
           <>
@@ -559,10 +612,24 @@ export const TransfersPage: React.FC = () => {
             </Button>
             <Button
               variant="green"
-              onClick={() => {
-                addContract(cv);
-                setContractForm(false);
-                toast('Contract logged', 'success');
+              onClick={async () => {
+                if (!cv.club.trim() || !cv.league.trim() || !cv.startSeason.trim()) {
+                  toast('Club, league, and start season are required', 'error');
+                  return;
+                }
+                try {
+                  await addContract({
+                    club: cv.club.trim(),
+                    league: cv.league.trim(),
+                    startSeason: cv.startSeason.trim(),
+                    notes: cv.notes.trim(),
+                  });
+                  setContractForm(false);
+                  setCv({ club: '', league: '', startSeason: '', notes: '' });
+                  toast('Contract logged', 'success');
+                } catch (err) {
+                  toast(err instanceof Error ? err.message : 'Failed to log contract', 'error');
+                }
               }}
             >
               Add
@@ -579,48 +646,103 @@ export const TransfersPage: React.FC = () => {
               onChange={(e) => setCv((v) => ({ ...v, league: e.target.value }))}
             />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
-            <Input
-              label="Start Season"
-              value={cv.startSeason}
-              onChange={(e) => setCv((v) => ({ ...v, startSeason: e.target.value }))}
-              placeholder="2025/26"
-            />
-            <Input
-              label="End Season"
-              value={cv.endSeason}
-              onChange={(e) => setCv((v) => ({ ...v, endSeason: e.target.value }))}
-              placeholder="2027/28"
-            />
+          <Input
+            label="Start Season"
+            value={cv.startSeason}
+            onChange={(e) => setCv((v) => ({ ...v, startSeason: e.target.value }))}
+            placeholder="2025/26"
+          />
+          <div style={{ fontSize: '12px', color: 'var(--muted)' }}>
+            End season and match stats are logged later with the <strong style={{ color: 'var(--text)' }}>Close</strong> action on this contract.
           </div>
+          <Textarea label="Notes" value={cv.notes} onChange={(e) => setCv((v) => ({ ...v, notes: e.target.value }))} />
+        </div>
+      </Modal>
+
+      <Modal
+        open={closeContractForm}
+        onClose={() => {
+          setCloseContractForm(false);
+          setClosingContract(null);
+        }}
+        title="Close Contract"
+        width="560px"
+        actions={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setCloseContractForm(false);
+                setClosingContract(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="green"
+              onClick={async () => {
+                if (!closingContract) return;
+                if (!closeCv.endSeason.trim()) {
+                  toast('End season is required', 'error');
+                  return;
+                }
+                try {
+                  await updateContract(closingContract.id, {
+                    endSeason: closeCv.endSeason.trim(),
+                    apps: closeCv.apps,
+                    goals: closeCv.goals,
+                    assists: closeCv.assists,
+                    avgRating: closeCv.avgRating,
+                    notes: closeCv.notes,
+                  });
+                  setCloseContractForm(false);
+                  setClosingContract(null);
+                  toast('Contract closed', 'success');
+                } catch (err) {
+                  toast(err instanceof Error ? err.message : 'Failed to close contract', 'error');
+                }
+              }}
+            >
+              Save
+            </Button>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <Input
+            label="End Season"
+            value={closeCv.endSeason}
+            onChange={(e) => setCloseCv((v) => ({ ...v, endSeason: e.target.value }))}
+            placeholder="2027/28"
+          />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px' }}>
             <Input
               label="Apps"
               type="number"
-              value={cv.apps}
-              onChange={(e) => setCv((v) => ({ ...v, apps: Number(e.target.value) }))}
+              value={closeCv.apps}
+              onChange={(e) => setCloseCv((v) => ({ ...v, apps: Number(e.target.value) || 0 }))}
             />
             <Input
               label="Goals"
               type="number"
-              value={cv.goals}
-              onChange={(e) => setCv((v) => ({ ...v, goals: Number(e.target.value) }))}
+              value={closeCv.goals}
+              onChange={(e) => setCloseCv((v) => ({ ...v, goals: Number(e.target.value) || 0 }))}
             />
             <Input
               label="Assists"
               type="number"
-              value={cv.assists}
-              onChange={(e) => setCv((v) => ({ ...v, assists: Number(e.target.value) }))}
+              value={closeCv.assists}
+              onChange={(e) => setCloseCv((v) => ({ ...v, assists: Number(e.target.value) || 0 }))}
             />
             <Input
               label="Avg Rating"
               type="number"
               step="0.1"
-              value={cv.avgRating}
-              onChange={(e) => setCv((v) => ({ ...v, avgRating: Number(e.target.value) }))}
+              value={closeCv.avgRating}
+              onChange={(e) => setCloseCv((v) => ({ ...v, avgRating: Number(e.target.value) || 0 }))}
             />
           </div>
-          <Textarea label="Notes" value={cv.notes} onChange={(e) => setCv((v) => ({ ...v, notes: e.target.value }))} />
+          <Textarea label="Notes" value={closeCv.notes} onChange={(e) => setCloseCv((v) => ({ ...v, notes: e.target.value }))} />
         </div>
       </Modal>
     </div>

@@ -37,6 +37,16 @@ const createContract = asyncHandler(async (req, res) => {
   return success(res, data, 'Contract created', 201);
 });
 
+const updateContract = asyncHandler(async (req, res) => {
+  const data = await service.updateContract(
+    req.user.id,
+    req.params.careerId,
+    req.params.id,
+    req.validated?.body || req.body,
+  );
+  return success(res, data, 'Contract updated');
+});
+
 const deleteContract = asyncHandler(async (req, res) => {
   await service.deleteContract(req.user.id, req.params.careerId, req.params.id);
   return res.status(204).send();
@@ -68,6 +78,7 @@ module.exports = {
   deleteOffer,
   listContracts,
   createContract,
+  updateContract,
   deleteContract,
   listAgentNotes,
   createAgentNote,

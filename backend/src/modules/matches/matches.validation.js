@@ -15,11 +15,17 @@ const paramsCareerAndId = z.object({
 });
 
 const ovrSpSchema = z.union([z.number().int(), z.literal('')]).optional();
+const matchDateSchema = z
+  .string()
+  .refine((value) => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return true;
+    return !Number.isNaN(new Date(value).getTime());
+  }, 'Invalid match date');
 
 const matchPayload = z.object({
   competition: competitionEnum,
   stage: stageEnum,
-  matchDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  matchDate: matchDateSchema,
   opponent: z.string().min(1),
   posPlayed: positionEnum,
   scoreFor: z.number().int().min(0),

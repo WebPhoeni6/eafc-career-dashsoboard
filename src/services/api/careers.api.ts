@@ -29,6 +29,11 @@ export interface CareerPerformanceInsights {
     season: string[];
     transfers: string[];
   };
+  milestoneSuggestions: {
+    label: string;
+    target: number;
+    unit: string;
+  }[];
   keyMetricsToWatch: string[];
   recentFormSnapshot: string;
   recentMatchesConsidered: number;

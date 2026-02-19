@@ -17,6 +17,40 @@ function mapAgentNote(item) {
   };
 }
 
+function normalizeContractCreateInput(input) {
+  return {
+    club: String(input.club || '').trim(),
+    league: String(input.league || '').trim(),
+    startSeason: String(input.startSeason || '').trim(),
+    endSeason: String(input.endSeason || '').trim() || 'Active',
+    apps: Number.isFinite(Number(input.apps)) ? Number(input.apps) : 0,
+    goals: Number.isFinite(Number(input.goals)) ? Number(input.goals) : 0,
+    assists: Number.isFinite(Number(input.assists)) ? Number(input.assists) : 0,
+    avgRating: Number.isFinite(Number(input.avgRating)) ? Math.max(0, Math.min(10, Number(input.avgRating))) : 0,
+    trophies: Array.isArray(input.trophies) ? input.trophies.map((t) => String(t).trim()).filter(Boolean) : [],
+    notes: typeof input.notes === 'string' ? input.notes : '',
+  };
+}
+
+function normalizeContractUpdateInput(input) {
+  const out = {};
+  if ('club' in input) out.club = String(input.club || '').trim();
+  if ('league' in input) out.league = String(input.league || '').trim();
+  if ('startSeason' in input) out.startSeason = String(input.startSeason || '').trim();
+  if ('endSeason' in input) out.endSeason = String(input.endSeason || '').trim() || 'Active';
+  if ('apps' in input && Number.isFinite(Number(input.apps))) out.apps = Number(input.apps);
+  if ('goals' in input && Number.isFinite(Number(input.goals))) out.goals = Number(input.goals);
+  if ('assists' in input && Number.isFinite(Number(input.assists))) out.assists = Number(input.assists);
+  if ('avgRating' in input && Number.isFinite(Number(input.avgRating))) {
+    out.avgRating = Math.max(0, Math.min(10, Number(input.avgRating)));
+  }
+  if ('trophies' in input) {
+    out.trophies = Array.isArray(input.trophies) ? input.trophies.map((t) => String(t).trim()).filter(Boolean) : [];
+  }
+  if ('notes' in input) out.notes = typeof input.notes === 'string' ? input.notes : '';
+  return out;
+}
+
 async function listOffers(userId, careerId) {
   await assertCareerOwnership(careerId, userId);
   const rows = await repo.offer.list(careerId);
@@ -55,7 +89,18 @@ async function listContracts(userId, careerId) {
 
 async function createContract(userId, careerId, input) {
   await assertCareerOwnership(careerId, userId);
-  return repo.contract.create({ careerId, ...input });
+  return repo.contract.create({ careerId, ...normalizeContractCreateInput(input) });
+}
+
+async function updateContract(userId, careerId, id, input) {
+  await assertCareerOwnership(careerId, userId);
+  const payload = normalizeContractUpdateInput(input);
+  const result = await repo.contract.update(careerId, id, payload);
+  if (!result.count) throw new AppError('Contract not found', 404, 'NOT_FOUND');
+  const rows = await repo.contract.list(careerId);
+  const updated = rows.find((row) => row.id === id);
+  if (!updated) throw new AppError('Contract not found', 404, 'NOT_FOUND');
+  return updated;
 }
 
 async function deleteContract(userId, careerId, id) {
@@ -93,6 +138,7 @@ module.exports = {
   deleteOffer,
   listContracts,
   createContract,
+  updateContract,
   deleteContract,
   listAgentNotes,
   createAgentNote,

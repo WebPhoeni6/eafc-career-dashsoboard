@@ -65,15 +65,34 @@ const createContractSchema = z.object({
     club: z.string().min(1),
     league: z.string().min(1),
     startSeason: z.string().min(1),
-    endSeason: z.string().min(1),
-    apps: z.number().int().min(0),
-    goals: z.number().int().min(0),
-    assists: z.number().int().min(0),
-    avgRating: z.number().min(0).max(10),
-    trophies: z.array(z.string()),
-    notes: z.string(),
+    endSeason: z.string().optional(),
+    apps: z.number().int().min(0).optional(),
+    goals: z.number().int().min(0).optional(),
+    assists: z.number().int().min(0).optional(),
+    avgRating: z.number().min(0).max(10).optional(),
+    trophies: z.array(z.string()).optional(),
+    notes: z.string().optional(),
   }),
   params: careerParam,
+  query: z.object({}).optional(),
+});
+
+const updateContractSchema = z.object({
+  body: z
+    .object({
+      club: z.string().min(1).optional(),
+      league: z.string().min(1).optional(),
+      startSeason: z.string().min(1).optional(),
+      endSeason: z.string().min(1).optional(),
+      apps: z.number().int().min(0).optional(),
+      goals: z.number().int().min(0).optional(),
+      assists: z.number().int().min(0).optional(),
+      avgRating: z.number().min(0).max(10).optional(),
+      trophies: z.array(z.string()).optional(),
+      notes: z.string().optional(),
+    })
+    .refine((v) => Object.keys(v).length > 0, { message: 'At least one field is required' }),
+  params: resourceParam,
   query: z.object({}).optional(),
 });
 
@@ -94,5 +113,6 @@ module.exports = {
   createOfferSchema,
   updateOfferSchema,
   createContractSchema,
+  updateContractSchema,
   createAgentNoteSchema,
 };

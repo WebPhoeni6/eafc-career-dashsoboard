@@ -10,6 +10,15 @@ import { Zap } from 'lucide-react';
 
 type MatchFormValues = Omit<Match, 'id' | 'createdAt' | 'updatedAt'>;
 
+function normalizeMatchDate(value: unknown): string {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toISOString().slice(0, 10);
+}
+
 function defaultMatchValues(): MatchFormValues {
   return {
     competition: 'League', stage: 'N/A', matchDate: todayISO(),
@@ -38,14 +47,23 @@ interface MatchFormProps {
 }
 
 export const MatchForm: React.FC<MatchFormProps> = ({ initial, prefill, prefillVersion, onSubmit, onCancel, submitLabel = 'Add Match' }) => {
-  const [v, setV] = useState<MatchFormValues>({ ...defaultMatchValues(), ...initial });
+  const [v, setV] = useState<MatchFormValues>({
+    ...defaultMatchValues(),
+    ...initial,
+    ...(normalizeMatchDate(initial?.matchDate) ? { matchDate: normalizeMatchDate(initial?.matchDate) } : {}),
+  });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [quickScore, setQuickScore] = useState('');
 
   useEffect(() => {
     if (!prefill) return;
-    setV((prev) => ({ ...prev, ...prefill }));
+    const normalizedDate = normalizeMatchDate(prefill.matchDate);
+    setV((prev) => ({
+      ...prev,
+      ...prefill,
+      ...(normalizedDate ? { matchDate: normalizedDate } : {}),
+    }));
   }, [prefillVersion]);
 
   useEffect(() => {
@@ -71,11 +89,13 @@ export const MatchForm: React.FC<MatchFormProps> = ({ initial, prefill, prefillV
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const errs: Record<string, string> = {};
+    const normalizedDate = normalizeMatchDate(v.matchDate);
+    if (!normalizedDate) errs.matchDate = 'Date is required';
     if (!v.opponent.trim()) errs.opponent = 'Opponent is required';
     if (v.matchRating < 0 || v.matchRating > 10) errs.matchRating = 'Rating must be 0–10';
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});
-    onSubmit(v);
+    onSubmit({ ...v, matchDate: normalizedDate });
   };
 
   const g2 = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' } as const;
@@ -105,7 +125,7 @@ export const MatchForm: React.FC<MatchFormProps> = ({ initial, prefill, prefillV
       </div>
 
       <div style={g2}>
-        <Input label="Date" type="date" value={v.matchDate} onChange={(e) => set('matchDate', e.target.value)} />
+        <Input label="Date" type="date" value={v.matchDate} onChange={(e) => set('matchDate', e.target.value)} error={errors.matchDate} />
         <Input label="Opponent" value={v.opponent} onChange={(e) => set('opponent', e.target.value)} error={errors.opponent} required />
       </div>
 
