@@ -47,7 +47,22 @@ function byTimestampAsc<T extends { timestamp?: string; createdAt?: string }>(it
   });
 }
 
-export const useCareerDirectorStore = create<CareerDirectorState>()((set, get) => ({
+function dedupeById<T extends { id?: string }>(items: T[]): T[] {
+  const byId = new Map<string, T>();
+  const withoutId: T[] = [];
+
+  for (const item of items) {
+    if (item?.id) {
+      byId.set(item.id, item);
+      continue;
+    }
+    withoutId.push(item);
+  }
+
+  return [...byId.values(), ...withoutId];
+}
+
+export const useCareerDirectorStore = create<CareerDirectorState>()((set) => ({
   reportsByCareer: {},
   chatsByCareer: {},
   loadingByCareer: {},
@@ -63,7 +78,7 @@ export const useCareerDirectorStore = create<CareerDirectorState>()((set, get) =
       set((state) => ({
         reportsByCareer: {
           ...state.reportsByCareer,
-          [id]: byTimestampAsc(history.reports),
+          [id]: byTimestampAsc(dedupeById(history.reports)),
         },
         chatsByCareer: {
           ...state.chatsByCareer,
@@ -87,7 +102,9 @@ export const useCareerDirectorStore = create<CareerDirectorState>()((set, get) =
       set((state) => ({
         reportsByCareer: {
           ...state.reportsByCareer,
-          [id]: byTimestampAsc([...(state.reportsByCareer[id] || []), created]),
+          [id]: byTimestampAsc(
+            dedupeById([...(state.reportsByCareer[id] || []), created]),
+          ),
         },
       }));
       return created;

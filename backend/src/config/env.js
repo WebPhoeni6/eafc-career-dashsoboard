@@ -27,6 +27,12 @@ function isValidCorsOrigin(origin) {
   }
 }
 
+function blankToUndefined(value) {
+  if (value === undefined || value === null) return undefined;
+  const normalized = String(value).trim();
+  return normalized ? normalized : undefined;
+}
+
 const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
@@ -38,12 +44,15 @@ const envSchema = z.object({
   JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
   JWT_REFRESH_EXPIRES_IN: z.string().default("7d"),
   PASSWORD_RESET_TOKEN_TTL_MINUTES: z.coerce.number().int().min(5).max(180).default(30),
-  GEMINI_API_KEY: z.string().min(20).optional(),
+  GEMINI_API_KEY: z.preprocess(blankToUndefined, z.string().min(20).optional()),
   GEMINI_MODEL: z.string().default("gemini-2.5-flash"),
-  GEMINI_FAST_MODEL: z.string().optional(),
-  OPENAI_API_KEY: z.string().min(20).optional(),
+  GEMINI_FAST_MODEL: z.preprocess(blankToUndefined, z.string().optional()),
+  AI_PROVIDER_ORDER: z.string().default("openai,gemini"),
+  CAREER_DIRECTOR_REPORT_DAILY_MAX: z.coerce.number().int().min(1).max(100).default(3),
+  CAREER_DIRECTOR_CHAT_COOLDOWN_MS: z.coerce.number().int().min(0).max(300000).default(15000),
+  OPENAI_API_KEY: z.preprocess(blankToUndefined, z.string().min(20).optional()),
   OPENAI_MODEL: z.string().default("gpt-4o-mini"),
-  OPENAI_FAST_MODEL: z.string().optional(),
+  OPENAI_FAST_MODEL: z.preprocess(blankToUndefined, z.string().optional()),
   COOKIE_SECRET: z.string().min(16),
   CORS_ORIGIN: z.string().min(1),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900000),

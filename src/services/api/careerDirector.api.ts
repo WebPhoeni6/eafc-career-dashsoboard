@@ -48,6 +48,12 @@ export interface CareerDirectorReportRecord {
     contextWindow: CareerDirectorContextWindow;
   };
   output: CareerDirectorReportOutput;
+  cache?: {
+    hit: boolean;
+    fingerprint?: string;
+    sourceEventId?: string | null;
+    servedAt?: string;
+  };
 }
 
 export interface CareerDirectorChatMessage {

@@ -480,14 +480,14 @@ async function analyzeWithEAFCQuick(files) {
   }
 
   const quickFiles = Array.isArray(files) ? files.slice(0, 2) : [];
-  const geminiResult = await callGeminiQuick(quickFiles);
-  if (geminiResult) return geminiResult;
-
   const openAiResult = await callOpenAIQuick(quickFiles);
   if (openAiResult) return openAiResult;
 
+  const geminiResult = await callGeminiQuick(quickFiles);
+  if (geminiResult) return geminiResult;
+
   throw new AppError(
-    'AI analysis is not configured. Set GEMINI_API_KEY in backend/.env',
+    'AI analysis is not configured. Set OPENAI_API_KEY (preferred) or GEMINI_API_KEY in backend/.env',
     400,
     'AI_NOT_CONFIGURED',
   );
@@ -498,14 +498,14 @@ async function analyzeWithAI(files) {
     throw new AppError('Runtime does not support fetch for AI analysis', 500, 'AI_RUNTIME_ERROR');
   }
 
-  const geminiResult = await callGemini(files);
-  if (geminiResult) return geminiResult;
-
   const openAiResult = await callOpenAI(files);
   if (openAiResult) return openAiResult;
 
+  const geminiResult = await callGemini(files);
+  if (geminiResult) return geminiResult;
+
   throw new AppError(
-    'AI analysis is not configured. Set GEMINI_API_KEY in backend/.env',
+    'AI analysis is not configured. Set OPENAI_API_KEY (preferred) or GEMINI_API_KEY in backend/.env',
     400,
     'AI_NOT_CONFIGURED',
   );

@@ -1,8 +1,14 @@
-const { z } = require('zod');
+const { z } = require("zod");
 
-const phaseEnum = z.enum(['breakout', 'consolidation', 'prime', 'decline']);
-const toneEnum = z.enum(['Supportive', 'Balanced', 'Harsh']);
-const focusEnum = z.enum(['UCL', 'Domestic', 'Development', 'Transfers', 'Mentality']);
+const phaseEnum = z.enum(["breakout", "consolidation", "prime", "decline"]);
+const toneEnum = z.enum(["Supportive", "Balanced", "Harsh"]);
+const focusEnum = z.enum([
+  "UCL",
+  "Domestic",
+  "Development",
+  "Transfers",
+  "Mentality",
+]);
 
 const reportSchema = z.object({
   headline: z.string().min(1).max(180),
@@ -26,26 +32,36 @@ const reportSchema = z.object({
   strengths: z.array(z.string().min(1).max(220)).min(3).max(6),
   weaknesses: z.array(z.string().min(1).max(220)).min(3).max(6),
   nextMatchMandates: z.array(z.string().min(1).max(220)).min(3).max(3),
-  developmentPlan: z.array(
-    z.object({
-      allocation: z.string().min(1).max(200),
-      reason: z.string().min(1).max(400),
-    }),
-  ).min(1).max(3),
+  developmentPlan: z
+    .array(
+      z.object({
+        allocation: z.string().min(1).max(200),
+        reason: z.string().min(1).max(400),
+      }),
+    )
+    .min(1)
+    .max(3),
   transferOutlook: z.object({
-    recommendation: z.enum(['stay', 'leave', 'conditional']),
+    recommendation: z.enum(["stay", "leave", "conditional"]),
     rationale: z.string().min(1).max(700),
     thresholds: z.array(z.string().min(1).max(220)).min(1).max(6),
   }),
-  milestonesSuggested: z.array(
-    z.object({
-      label: z.string().min(1).max(120),
-      target: z.number().int().min(1).max(999),
-      unit: z.string().min(1).max(40),
-      rationale: z.string().min(1).max(320),
-      deadline: z.string().min(1).max(40),
-    }),
-  ).min(3).max(6),
+  milestonesSuggested: z
+    .array(
+      z.object({
+        label: z.string().min(1).max(120),
+        target: z.preprocess((value) => {
+          const n = Number(value);
+          if (!Number.isFinite(n)) return value;
+          return Math.round(n);
+        }, z.number().int().min(1).max(999)),
+        unit: z.string().min(1).max(40),
+        rationale: z.string().min(1).max(320),
+        deadline: z.string().min(1).max(40),
+      }),
+    )
+    .min(1)
+    .max(6),
   narrativeTagsSuggested: z.array(z.string().min(1).max(80)).min(3).max(6),
   agentNotesSuggested: z.array(z.string().min(1).max(220)).min(1).max(3),
   risks: z.array(z.string().min(1).max(220)).min(2).max(8),

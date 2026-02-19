@@ -109,10 +109,14 @@ async function listCareerDirectorEvents(userId, careerId, limit = 200) {
   const rows = await prisma.$queryRawUnsafe(
     `
       SELECT id, event_type, payload, created_at
-      FROM career_director_events
-      WHERE user_id = $1 AND career_id = $2
+      FROM (
+        SELECT id, event_type, payload, created_at
+        FROM career_director_events
+        WHERE user_id = $1 AND career_id = $2
+        ORDER BY created_at DESC
+        LIMIT $3
+      ) recent
       ORDER BY created_at ASC
-      LIMIT $3
     `,
     userId,
     careerId,

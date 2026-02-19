@@ -158,4 +158,20 @@ describe('careerDirector data quality and context pack', () => {
     expect(pack.lastMatchesTable[0].xG).toBe('Not tracked');
     expect(pack.careerTotals.apps).toBe(2);
   });
+
+  test('builds compact prompt payload for deterministic prompting', () => {
+    const pack = __testables.buildContextPack(careerData, {
+      tone: 'Balanced',
+      focus: 'Development',
+      wholeCareer: false,
+      recentMatches: 8,
+    });
+
+    const payload = __testables.buildPromptPayload(pack);
+
+    expect(payload.deterministicMetrics).toBeTruthy();
+    expect(payload.recentEvidence.lastMatches.length).toBeLessThanOrEqual(6);
+    expect(payload.transferSignals).toBeTruthy();
+    expect(payload).not.toHaveProperty('contracts');
+  });
 });

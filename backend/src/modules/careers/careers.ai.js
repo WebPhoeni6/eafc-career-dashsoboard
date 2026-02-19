@@ -261,13 +261,17 @@ async function analyzeCareerContext(context) {
   }
 
   const prompt = buildPrompt(context);
-  const geminiResult = await callGemini(prompt);
-  if (geminiResult) return geminiResult;
-
   const openAiResult = await callOpenAI(prompt);
   if (openAiResult) return openAiResult;
 
-  throw new AppError('AI analysis is not configured. Set GEMINI_API_KEY in backend/.env', 400, 'AI_NOT_CONFIGURED');
+  const geminiResult = await callGemini(prompt);
+  if (geminiResult) return geminiResult;
+
+  throw new AppError(
+    'AI analysis is not configured. Set OPENAI_API_KEY (preferred) or GEMINI_API_KEY in backend/.env',
+    400,
+    'AI_NOT_CONFIGURED',
+  );
 }
 
 async function answerCareerQuestion(context, question) {
@@ -276,13 +280,17 @@ async function answerCareerQuestion(context, question) {
   }
 
   const prompt = buildQuestionPrompt(context, question);
-  const geminiResult = await callGemini(prompt);
-  if (geminiResult) return geminiResult;
-
   const openAiResult = await callOpenAI(prompt);
   if (openAiResult) return openAiResult;
 
-  throw new AppError('AI analysis is not configured. Set GEMINI_API_KEY in backend/.env', 400, 'AI_NOT_CONFIGURED');
+  const geminiResult = await callGemini(prompt);
+  if (geminiResult) return geminiResult;
+
+  throw new AppError(
+    'AI analysis is not configured. Set OPENAI_API_KEY (preferred) or GEMINI_API_KEY in backend/.env',
+    400,
+    'AI_NOT_CONFIGURED',
+  );
 }
 
 module.exports = {
