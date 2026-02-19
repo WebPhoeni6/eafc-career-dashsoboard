@@ -7,19 +7,21 @@ function normalizeModelName(model) {
 }
 
 function extractOutputText(payload) {
+  const texts = [];
+
   const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
-  const parts = candidates[0]?.content?.parts;
-  if (Array.isArray(parts)) {
+  for (const candidate of candidates) {
+    const parts = Array.isArray(candidate?.content?.parts) ? candidate.content.parts : [];
     const text = parts
       .map((part) => (typeof part?.text === 'string' ? part.text.trim() : ''))
       .filter(Boolean)
       .join('\n')
       .trim();
-    if (text) return text;
+    if (text) texts.push(text);
   }
 
   if (typeof payload?.output_text === 'string' && payload.output_text.trim()) {
-    return payload.output_text.trim();
+    texts.push(payload.output_text.trim());
   }
 
   const output = Array.isArray(payload?.output) ? payload.output : [];
@@ -32,7 +34,10 @@ function extractOutputText(payload) {
       }
     }
   }
-  return chunks.join('\n').trim();
+  if (chunks.length) texts.push(chunks.join('\n').trim());
+
+  if (!texts.length) return '';
+  return texts.sort((a, b) => b.length - a.length)[0];
 }
 
 function previewText(text, limit = 320) {
@@ -350,10 +355,17 @@ async function runJsonPrompt({ systemInstruction, prompt, schema, fixPromptSuffi
     'Start with "{" and end with "}" (or array brackets if schema requires an array).',
   ].join('\n');
 
+  const plainTextRetryPrompt = [
+    strictRetryPrompt,
+    'Important: keep values concise so the full JSON completes.',
+    'No commentary before or after JSON.',
+  ].join('\n');
+
   const attempts = [
-    { label: 'initial', prompt, temperature: 0.15 },
-    { label: 'repair', prompt: retryPrompt, temperature: 0 },
-    { label: 'strict-repair', prompt: strictRetryPrompt, temperature: 0 },
+    { label: 'initial', prompt, temperature: 0.15, responseMimeType: 'application/json' },
+    { label: 'repair', prompt: retryPrompt, temperature: 0, responseMimeType: 'application/json' },
+    { label: 'strict-repair', prompt: strictRetryPrompt, temperature: 0, responseMimeType: 'application/json' },
+    { label: 'text-repair', prompt: plainTextRetryPrompt, temperature: 0, responseMimeType: 'text/plain' },
   ];
 
   const diagnostics = [];
@@ -362,7 +374,7 @@ async function runJsonPrompt({ systemInstruction, prompt, schema, fixPromptSuffi
     const rawText = await callGeminiRaw({
       systemInstruction,
       prompt: attempt.prompt,
-      responseMimeType: 'application/json',
+      responseMimeType: attempt.responseMimeType,
       temperature: attempt.temperature,
       maxOutputTokens: 3200,
     });
