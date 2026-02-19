@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { Match } from '../../../types/match.types';
 import { fmtDate } from '../../../utils/date';
 import { fmtRating, num, resultLabel } from '../../../utils/format';
@@ -40,6 +40,11 @@ const trustOrder: Record<Match['trust'], number> = {
   Full: 4,
 };
 
+const VIRTUALIZATION_THRESHOLD = 120;
+const VIRTUAL_ROW_HEIGHT = 50;
+const VIRTUAL_VIEWPORT_HEIGHT = 560;
+const VIRTUAL_OVERSCAN = 10;
+
 export const MatchTable: React.FC<MatchTableProps> = ({
   matches,
   onEdit,
@@ -49,6 +54,7 @@ export const MatchTable: React.FC<MatchTableProps> = ({
   onDeleteImage,
 }) => {
   const [detail, setDetail] = useState<Match | null>(null);
+  const [scrollTop, setScrollTop] = useState(0);
   const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection }>({
     key: 'matchDate',
     direction: 'desc',
@@ -188,6 +194,20 @@ export const MatchTable: React.FC<MatchTableProps> = ({
       .map((x) => x.m);
   }, [matches, oldestMatchId, sort]);
 
+  useEffect(() => {
+    setScrollTop(0);
+  }, [sort, matches.length]);
+
+  const shouldVirtualize = sortedMatches.length > VIRTUALIZATION_THRESHOLD;
+  const startIndex = shouldVirtualize ? Math.max(0, Math.floor(scrollTop / VIRTUAL_ROW_HEIGHT) - VIRTUAL_OVERSCAN) : 0;
+  const visibleCount = shouldVirtualize
+    ? Math.ceil(VIRTUAL_VIEWPORT_HEIGHT / VIRTUAL_ROW_HEIGHT) + VIRTUAL_OVERSCAN * 2
+    : sortedMatches.length;
+  const endIndex = shouldVirtualize ? Math.min(sortedMatches.length, startIndex + visibleCount) : sortedMatches.length;
+  const renderedMatches = shouldVirtualize ? sortedMatches.slice(startIndex, endIndex) : sortedMatches;
+  const topSpacerHeight = shouldVirtualize ? startIndex * VIRTUAL_ROW_HEIGHT : 0;
+  const bottomSpacerHeight = shouldVirtualize ? (sortedMatches.length - endIndex) * VIRTUAL_ROW_HEIGHT : 0;
+
   const toggleSort = (key: SortKey) => {
     setSort((prev) => {
       if (prev.key === key) {
@@ -235,7 +255,19 @@ export const MatchTable: React.FC<MatchTableProps> = ({
 
   return (
     <>
-      <div style={{ overflowX: 'auto', borderRadius: '14px', border: '1px solid var(--border-muted)' }}>
+      <div
+        style={{
+          overflowX: 'auto',
+          overflowY: shouldVirtualize ? 'auto' : 'visible',
+          maxHeight: shouldVirtualize ? `${VIRTUAL_VIEWPORT_HEIGHT}px` : undefined,
+          borderRadius: '14px',
+          border: '1px solid var(--border-muted)',
+        }}
+        onScroll={(event) => {
+          if (!shouldVirtualize) return;
+          setScrollTop(event.currentTarget.scrollTop);
+        }}
+      >
         <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, minWidth: '760px' }}>
           <thead>
             <tr>
@@ -257,7 +289,13 @@ export const MatchTable: React.FC<MatchTableProps> = ({
             </tr>
           </thead>
           <tbody>
-            {sortedMatches.map((m, idx) => {
+            {shouldVirtualize && topSpacerHeight > 0 && (
+              <tr>
+                <td colSpan={15} style={{ padding: 0, borderBottom: 'none', height: `${topSpacerHeight}px` }} />
+              </tr>
+            )}
+            {renderedMatches.map((m, idx) => {
+              const rowIndex = shouldVirtualize ? startIndex + idx : idx;
               const res = resultLabel(num(m.scoreFor), num(m.scoreAgainst));
               const tags = getAutoTags(m, m.id === oldestMatchId);
 
@@ -272,7 +310,7 @@ export const MatchTable: React.FC<MatchTableProps> = ({
                     e.currentTarget.style.background = 'transparent';
                   }}
                 >
-                  <td style={{ ...td, color: 'var(--muted)' }}>{idx + 1}</td>
+                  <td style={{ ...td, color: 'var(--muted)' }}>{rowIndex + 1}</td>
                   <td style={td}>{fmtDate(m.matchDate)}</td>
                   <td style={td}>{pill(m.competition)}</td>
                   <td style={{ ...td, fontWeight: 600 }}>
@@ -331,6 +369,11 @@ export const MatchTable: React.FC<MatchTableProps> = ({
                 </tr>
               );
             })}
+            {shouldVirtualize && bottomSpacerHeight > 0 && (
+              <tr>
+                <td colSpan={15} style={{ padding: 0, borderBottom: 'none', height: `${bottomSpacerHeight}px` }} />
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

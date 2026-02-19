@@ -41,16 +41,34 @@ interface MatchFormProps {
   initial?: Partial<MatchFormValues>;
   prefill?: Partial<MatchFormValues> | null;
   prefillVersion?: number;
-  onSubmit: (m: MatchFormValues) => void;
+  draftKey?: string;
+  onSubmit: (m: MatchFormValues) => void | Promise<void>;
   onCancel?: () => void;
   submitLabel?: string;
 }
 
-export const MatchForm: React.FC<MatchFormProps> = ({ initial, prefill, prefillVersion, onSubmit, onCancel, submitLabel = 'Add Match' }) => {
-  const [v, setV] = useState<MatchFormValues>({
-    ...defaultMatchValues(),
-    ...initial,
-    ...(normalizeMatchDate(initial?.matchDate) ? { matchDate: normalizeMatchDate(initial?.matchDate) } : {}),
+export const MatchForm: React.FC<MatchFormProps> = ({ initial, prefill, prefillVersion, draftKey, onSubmit, onCancel, submitLabel = 'Add Match' }) => {
+  const [v, setV] = useState<MatchFormValues>(() => {
+    const base = {
+      ...defaultMatchValues(),
+      ...initial,
+      ...(normalizeMatchDate(initial?.matchDate) ? { matchDate: normalizeMatchDate(initial?.matchDate) } : {}),
+    };
+
+    if (!draftKey || initial) return base;
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (!raw) return base;
+      const parsed = JSON.parse(raw) as Partial<MatchFormValues>;
+      const normalizedDate = normalizeMatchDate(parsed.matchDate);
+      return {
+        ...base,
+        ...parsed,
+        ...(normalizedDate ? { matchDate: normalizedDate } : {}),
+      };
+    } catch {
+      return base;
+    }
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -69,6 +87,15 @@ export const MatchForm: React.FC<MatchFormProps> = ({ initial, prefill, prefillV
   useEffect(() => {
     setQuickScore(`${v.scoreFor}-${v.scoreAgainst}`);
   }, [v.scoreFor, v.scoreAgainst]);
+
+  useEffect(() => {
+    if (!draftKey || initial) return;
+    try {
+      localStorage.setItem(draftKey, JSON.stringify(v));
+    } catch {
+      // no-op
+    }
+  }, [v, draftKey, initial]);
 
   const set = <K extends keyof MatchFormValues>(field: K, value: MatchFormValues[K]) =>
     setV((prev) => ({ ...prev, [field]: value }));
@@ -95,7 +122,28 @@ export const MatchForm: React.FC<MatchFormProps> = ({ initial, prefill, prefillV
     if (v.matchRating < 0 || v.matchRating > 10) errs.matchRating = 'Rating must be 0–10';
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});
-    onSubmit({ ...v, matchDate: normalizedDate });
+    const payload = { ...v, matchDate: normalizedDate };
+    const result = onSubmit(payload);
+    if (draftKey && !initial) {
+      Promise.resolve(result)
+        .then(() => {
+          localStorage.removeItem(draftKey);
+        })
+        .catch(() => {
+          // keep draft if submit fails
+        });
+    }
+  };
+
+  const clearDraft = () => {
+    if (!draftKey || initial) return;
+    localStorage.removeItem(draftKey);
+    setV({
+      ...defaultMatchValues(),
+      ...(prefill ?? {}),
+      ...(normalizeMatchDate(prefill?.matchDate) ? { matchDate: normalizeMatchDate(prefill?.matchDate) } : {}),
+    });
+    setErrors({});
   };
 
   const g2 = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' } as const;
@@ -227,6 +275,11 @@ export const MatchForm: React.FC<MatchFormProps> = ({ initial, prefill, prefillV
       <Textarea label="Notes" value={v.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Highlights, misses, vibes…" />
 
       <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+        {draftKey && !initial && (
+          <Button type="button" variant="ghost" onClick={clearDraft}>
+            Clear Draft
+          </Button>
+        )}
         {onCancel && <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>}
         <Button type="submit" variant="green">{submitLabel}</Button>
       </div>

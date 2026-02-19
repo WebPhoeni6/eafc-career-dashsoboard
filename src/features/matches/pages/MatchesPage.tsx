@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useMatchesStore } from '../../../store/matches.store';
 import { getFilteredMatches } from '../selectors';
@@ -21,7 +21,7 @@ export const MatchesPage: React.FC = () => {
   const [editMatch, setEditMatch] = useState<Match | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const filtered = getFilteredMatches(matches, filter);
+  const filtered = useMemo(() => getFilteredMatches(matches, filter), [matches, filter]);
 
   const handleEdit = (m: Match) => setEditMatch(m);
 

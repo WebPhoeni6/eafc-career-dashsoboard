@@ -1,18 +1,20 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useCareerStore } from '../../../store/career.store';
 import { useMatchesStore } from '../../../store/matches.store';
 import { useSeasonsStore } from '../../../store/seasons.store';
+import { useTransfersStore } from '../../../store/transfers.store';
 import { getDashboardData } from '../selectors';
 import { KPIGrid } from '../components/KPIGrid';
 import { FormMeter } from '../components/FormMeter';
 import { QuickActions } from '../components/QuickActions';
 import { LineChart } from '../../../components/charts/LineChart';
+import { Modal } from '../../../components/ui/Modal';
 import { Select } from '../../../components/ui/Select';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { PageHeader } from '../../../components/shared/PageHeader';
-import { Copy, EyeOff, LayoutDashboard, PlusCircle, Star, Trash2, Trophy } from 'lucide-react';
+import { Copy, EyeOff, LayoutDashboard, Pencil, PlusCircle, Star, Trash2, Trophy } from 'lucide-react';
 import { downloadCareerExport } from '../../../services/api/sync.api';
 import {
   askCareerPerformanceQuestion,
@@ -24,8 +26,9 @@ import { hydrateActiveCareerModules } from '../../../services/api/hydrate';
 import { useToast } from '../../../hooks/useToast';
 import { useLocalStorage } from '../../../hooks/useLocalStorage';
 import { fmtRating } from '../../../utils/format';
-import { fmtDate } from '../../../utils/date';
+import { fmtDate, todayISO } from '../../../utils/date';
 import { ApiError } from '../../../services/api/types';
+import type { SeasonChallenge } from '../../../types/season.types';
 
 type SortDirection = 'asc' | 'desc';
 type CompSortKey = 'competition' | 'apps' | 'goals' | 'assists' | 'avgRating';
@@ -38,6 +41,10 @@ export const DashboardPage: React.FC = () => {
   const trophies = useSeasonsStore((s) => s.trophies);
   const challenges = useSeasonsStore((s) => s.challenges);
   const addChallenge = useSeasonsStore((s) => s.addChallenge);
+  const updateChallenge = useSeasonsStore((s) => s.updateChallenge);
+  const deleteChallenge = useSeasonsStore((s) => s.deleteChallenge);
+  const addNarrativeTag = useSeasonsStore((s) => s.addNarrativeTag);
+  const addAgentNote = useTransfersStore((s) => s.addAgentNote);
   const toast = useToast((s) => s.show);
   const context = useOutletContext<{ openNewMatch: () => void } | null>();
   const [chartRange, setChartRange] = useState<ChartRange>('LAST_6M');
@@ -56,6 +63,13 @@ export const DashboardPage: React.FC = () => {
   const [insightQuestionLoading, setInsightQuestionLoading] = useState(false);
   const [insightFollowUps, setInsightFollowUps] = useState<CareerPerformanceQuestionResponse[]>([]);
   const [addingMilestoneLabel, setAddingMilestoneLabel] = useState<string | null>(null);
+  const [suggestionActionKey, setSuggestionActionKey] = useState<string | null>(null);
+  const [editingChallenge, setEditingChallenge] = useState<SeasonChallenge | null>(null);
+  const [challengeEditForm, setChallengeEditForm] = useState({
+    label: '',
+    target: 1,
+    unit: 'goals',
+  });
   const [hiddenCompletedMilestones, setHiddenCompletedMilestones] = useLocalStorage<string[]>(
     'dashboard.hidden.completed.milestones.v1',
     [],
@@ -86,10 +100,71 @@ export const DashboardPage: React.FC = () => {
     return filtered.length ? filtered : matches;
   }, [matches, chartRange]);
 
-  const data = getDashboardData(matches, career, chartMatches);
+  const data = useMemo(() => getDashboardData(matches, career, chartMatches), [matches, career, chartMatches]);
   const { kpis, form, compSplits, posSplits, bigGamePerformer, milestones, charts } = data;
-  const visibleMilestones = milestones.filter((m) => !(m.reached && hiddenCompletedMilestones.includes(m.key)));
   const challengeLabels = new Set(challenges.map((c) => c.label.trim().toLowerCase()));
+
+  const challengeProgressById = useMemo(() => {
+    const clean = (value: string) => value.trim().toLowerCase().replace(/[_-]/g, ' ');
+    const byId = new Map<string, { current: number; completed: boolean }>();
+
+    for (const challenge of challenges) {
+      const unit = clean(challenge.unit);
+      let current = challenge.current;
+
+      if (unit === 'goal' || unit === 'goals') current = kpis.goals;
+      else if (unit === 'assist' || unit === 'assists') current = kpis.assists;
+      else if (unit === 'appearance' || unit === 'appearances' || unit === 'app' || unit === 'apps' || unit === 'match' || unit === 'matches') current = kpis.apps;
+      else if (unit === 'ga' || unit === 'g/a' || unit === 'goal contribution' || unit === 'goal contributions') current = kpis.ga;
+      else if (unit === 'motm' || unit === 'man of the match') current = kpis.motmCount;
+      else if (unit === 'hat trick' || unit === 'hat tricks' || unit === 'hat-trick' || unit === 'hat-tricks') current = kpis.hatTricks;
+      else if (unit === 'clean sheet' || unit === 'clean sheets') current = matches.filter((m) => Number(m.scoreAgainst) === 0).length;
+      else if (unit === 'average rating' || unit === 'avg rating' || unit === 'rating') current = Number(kpis.avgRating.toFixed(2));
+
+      const roundedCurrent = Number(current.toFixed(2));
+      byId.set(challenge.id, {
+        current: roundedCurrent,
+        completed: roundedCurrent >= challenge.target,
+      });
+    }
+    return byId;
+  }, [challenges, kpis, matches]);
+
+  const milestoneCards = useMemo(() => {
+    const systemMilestones = milestones.map((m) => ({
+      key: m.key,
+      label: m.label,
+      target: m.target,
+      current: m.current,
+      unit: m.unit,
+      reached: m.reached,
+      source: 'system' as const,
+      challengeId: null as string | null,
+    }));
+
+    const challengeMilestones = challenges.map((c) => {
+      const synced = challengeProgressById.get(c.id);
+      const current = synced?.current ?? c.current;
+      const reached = synced?.completed ?? c.completed;
+      return {
+        key: `challenge:${c.id}`,
+        label: c.label,
+        target: c.target,
+        current,
+        unit: c.unit,
+        reached,
+        source: 'challenge' as const,
+        challengeId: c.id,
+      };
+    });
+
+    return [...systemMilestones, ...challengeMilestones];
+  }, [milestones, challenges, challengeProgressById]);
+
+  const visibleMilestones = useMemo(
+    () => milestoneCards.filter((m) => !(m.reached && hiddenCompletedMilestones.includes(m.key))),
+    [milestoneCards, hiddenCompletedMilestones],
+  );
 
   const sortedCompSplits = useMemo(() => {
     const dir = compSort.direction === 'asc' ? 1 : -1;
@@ -107,6 +182,45 @@ export const DashboardPage: React.FC = () => {
     });
   }, [posSplits, posSort]);
 
+  useEffect(() => {
+    const pending = challenges
+      .map((challenge) => {
+        const next = challengeProgressById.get(challenge.id);
+        if (!next) return null;
+        const currentChanged = Math.abs(next.current - challenge.current) > 0.01;
+        const completedChanged = next.completed !== challenge.completed;
+        if (!currentChanged && !completedChanged) return null;
+        return {
+          id: challenge.id,
+          current: next.current,
+          completed: next.completed,
+        };
+      })
+      .filter((item): item is { id: string; current: number; completed: boolean } => !!item);
+
+    if (!pending.length) return;
+
+    let cancelled = false;
+    const sync = async () => {
+      for (const item of pending) {
+        if (cancelled) break;
+        try {
+          await updateChallenge(item.id, {
+            current: item.current,
+            completed: item.completed,
+          });
+        } catch {
+          // silently skip auto-sync failures
+        }
+      }
+    };
+
+    void sync();
+    return () => {
+      cancelled = true;
+    };
+  }, [challenges, challengeProgressById, updateChallenge]);
+
   const toggleCompSort = (key: CompSortKey) => {
     setCompSort((prev) =>
       prev.key === key
@@ -123,7 +237,7 @@ export const DashboardPage: React.FC = () => {
     );
   };
 
-  const sortArrow = (active: boolean, direction: SortDirection) => (active ? (direction === 'asc' ? '↑' : '↓') : '↕');
+  const sortArrow = (active: boolean, direction: SortDirection) => (active ? (direction === 'asc' ? '^' : 'v') : '<>');
 
   const handleExport = async () => {
     if (!activeCareerId) {
@@ -191,10 +305,14 @@ export const DashboardPage: React.FC = () => {
       `Strengths: ${data.strengths.join('; ') || 'None identified yet'}`,
       `Concerns: ${data.concerns.join('; ') || 'No major concerns flagged'}`,
       `Next Match: ${data.recommendations.nextMatch.join('; ') || 'No suggestions'}`,
+      `Next Match Why: ${data.recommendationRationale?.nextMatch || 'n/a'}`,
       `Training: ${data.recommendations.training.join('; ') || 'No suggestions'}`,
+      `Training Why: ${data.recommendationRationale?.training || 'n/a'}`,
       `Season Plan: ${data.recommendations.season.join('; ') || 'No suggestions'}`,
+      `Season Plan Why: ${data.recommendationRationale?.season || 'n/a'}`,
       `Transfer Strategy: ${data.recommendations.transfers.join('; ') || 'No suggestions'}`,
-      `Milestone Suggestions: ${(Array.isArray(data.milestoneSuggestions) ? data.milestoneSuggestions : []).map((s) => `${s.label} (${s.target} ${s.unit})`).join('; ') || 'No suggestions'}`,
+      `Transfer Strategy Why: ${data.recommendationRationale?.transfers || 'n/a'}`,
+      `Milestone Suggestions: ${(Array.isArray(data.milestoneSuggestions) ? data.milestoneSuggestions : []).map((s) => `${s.label} (${s.target} ${s.unit})${s.why ? ` - ${s.why}` : ''}`).join('; ') || 'No suggestions'}`,
       `Metrics To Watch: ${data.keyMetricsToWatch.join('; ') || 'No metrics suggested'}`,
     ];
     return lines.join('\n');
@@ -263,6 +381,99 @@ export const DashboardPage: React.FC = () => {
       toast(err instanceof Error ? err.message : 'Failed to add milestone', 'error');
     } finally {
       setAddingMilestoneLabel(null);
+    }
+  };
+
+  const handleCreateAgentNoteFromSuggestion = async (text: string, tag: 'Strategy' | 'Goal' = 'Strategy') => {
+    const content = text.trim();
+    if (!content) return;
+    const actionKey = `note:${content}`;
+    try {
+      setSuggestionActionKey(actionKey);
+      await addAgentNote({
+        date: todayISO(),
+        content,
+        tag,
+      });
+      toast('Saved as agent note', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to save agent note', 'error');
+    } finally {
+      setSuggestionActionKey(null);
+    }
+  };
+
+  const handleCreateNarrativeTagFromSuggestion = async (text: string) => {
+    if (!career) {
+      toast('Set up your career profile first', 'error');
+      return;
+    }
+    const clean = text.trim();
+    if (!clean) return;
+    const tag = clean.length > 80 ? `${clean.slice(0, 77)}...` : clean;
+    const actionKey = `tag:${tag}`;
+    try {
+      setSuggestionActionKey(actionKey);
+      await addNarrativeTag({
+        season: career.season,
+        tag,
+      });
+      toast('Saved as story tag', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to save story tag', 'error');
+    } finally {
+      setSuggestionActionKey(null);
+    }
+  };
+
+  const openChallengeEditor = (challengeId: string) => {
+    const challenge = challenges.find((item) => item.id === challengeId);
+    if (!challenge) return;
+    setEditingChallenge(challenge);
+    setChallengeEditForm({
+      label: challenge.label,
+      target: challenge.target,
+      unit: challenge.unit,
+    });
+  };
+
+  const saveChallengeEdit = async () => {
+    if (!editingChallenge) return;
+    const label = challengeEditForm.label.trim();
+    const unit = challengeEditForm.unit.trim();
+    const target = Number(challengeEditForm.target);
+    if (!label) {
+      toast('Milestone label is required', 'error');
+      return;
+    }
+    if (!unit) {
+      toast('Milestone unit is required', 'error');
+      return;
+    }
+    if (!Number.isFinite(target) || target <= 0) {
+      toast('Milestone target must be greater than 0', 'error');
+      return;
+    }
+
+    try {
+      await updateChallenge(editingChallenge.id, {
+        label,
+        unit,
+        target: Math.round(target),
+      });
+      setEditingChallenge(null);
+      toast('Milestone updated', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to update milestone', 'error');
+    }
+  };
+
+  const deleteChallengeMilestone = async (challengeId: string) => {
+    try {
+      await deleteChallenge(challengeId);
+      toast('Milestone deleted', 'default');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to delete milestone', 'error');
     }
   };
 
@@ -381,17 +592,72 @@ export const DashboardPage: React.FC = () => {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
                 <div style={{ border: '1px solid var(--border-muted)', borderRadius: '12px', padding: '10px' }}>
                   <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>Next Match</div>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '12px', color: 'var(--muted)', display: 'grid', gap: '4px' }}>
-                    {insights.recommendations.nextMatch.map((item, idx) => <li key={`nm-${idx}`}>{item}</li>)}
-                    {insights.recommendations.nextMatch.length === 0 && <li>No suggestions</li>}
-                  </ul>
+                  <div style={{ display: 'grid', gap: '8px' }}>
+                    {insights.recommendations.nextMatch.map((item, idx) => (
+                      <div key={`nm-${idx}`} style={{ border: '1px solid var(--border-muted)', borderRadius: '8px', padding: '8px', display: 'grid', gap: '6px' }}>
+                        <div style={{ fontSize: '12px', color: 'var(--muted)' }}>{item}</div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={suggestionActionKey === `note:${item}`}
+                            onClick={() => {
+                              void handleCreateAgentNoteFromSuggestion(item, 'Strategy');
+                            }}
+                          >
+                            {suggestionActionKey === `note:${item}` ? 'Saving...' : 'Add Note'}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                    {insights.recommendations.nextMatch.length === 0 && <div style={{ fontSize: '12px', color: 'var(--muted)' }}>No suggestions</div>}
+                  </div>
+                  {insights.recommendationRationale?.nextMatch && (
+                    <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--muted)' }}>
+                      Why: {insights.recommendationRationale.nextMatch}
+                    </div>
+                  )}
                 </div>
                 <div style={{ border: '1px solid var(--border-muted)', borderRadius: '12px', padding: '10px' }}>
                   <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>Training Focus</div>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '12px', color: 'var(--muted)', display: 'grid', gap: '4px' }}>
-                    {insights.recommendations.training.map((item, idx) => <li key={`tr-${idx}`}>{item}</li>)}
-                    {insights.recommendations.training.length === 0 && <li>No suggestions</li>}
-                  </ul>
+                  <div style={{ display: 'grid', gap: '8px' }}>
+                    {insights.recommendations.training.map((item, idx) => (
+                      <div key={`tr-${idx}`} style={{ border: '1px solid var(--border-muted)', borderRadius: '8px', padding: '8px', display: 'grid', gap: '6px' }}>
+                        <div style={{ fontSize: '12px', color: 'var(--muted)' }}>{item}</div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', flexWrap: 'wrap' }}>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={suggestionActionKey === `note:${item}`}
+                            onClick={() => {
+                              void handleCreateAgentNoteFromSuggestion(item, 'Goal');
+                            }}
+                          >
+                            {suggestionActionKey === `note:${item}` ? 'Saving...' : 'Add Note'}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={suggestionActionKey === `tag:${item.length > 80 ? `${item.slice(0, 77)}...` : item}`}
+                            onClick={() => {
+                              void handleCreateNarrativeTagFromSuggestion(item);
+                            }}
+                          >
+                            {suggestionActionKey === `tag:${item.length > 80 ? `${item.slice(0, 77)}...` : item}` ? 'Saving...' : 'Add Tag'}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                    {insights.recommendations.training.length === 0 && <div style={{ fontSize: '12px', color: 'var(--muted)' }}>No suggestions</div>}
+                  </div>
+                  {insights.recommendationRationale?.training && (
+                    <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--muted)' }}>
+                      Why: {insights.recommendationRationale.training}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -399,17 +665,61 @@ export const DashboardPage: React.FC = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
                   <div style={{ border: '1px solid var(--border-muted)', borderRadius: '12px', padding: '10px' }}>
                     <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>Season Plan</div>
-                    <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '12px', color: 'var(--muted)', display: 'grid', gap: '4px' }}>
-                      {insights.recommendations.season.map((item, idx) => <li key={`se-${idx}`}>{item}</li>)}
-                      {insights.recommendations.season.length === 0 && <li>No suggestions</li>}
-                    </ul>
+                    <div style={{ display: 'grid', gap: '8px' }}>
+                      {insights.recommendations.season.map((item, idx) => (
+                        <div key={`se-${idx}`} style={{ border: '1px solid var(--border-muted)', borderRadius: '8px', padding: '8px', display: 'grid', gap: '6px' }}>
+                          <div style={{ fontSize: '12px', color: 'var(--muted)' }}>{item}</div>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              disabled={suggestionActionKey === `note:${item}`}
+                              onClick={() => {
+                                void handleCreateAgentNoteFromSuggestion(item, 'Goal');
+                              }}
+                            >
+                              {suggestionActionKey === `note:${item}` ? 'Saving...' : 'Add Note'}
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                      {insights.recommendations.season.length === 0 && <div style={{ fontSize: '12px', color: 'var(--muted)' }}>No suggestions</div>}
+                    </div>
+                    {insights.recommendationRationale?.season && (
+                      <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--muted)' }}>
+                        Why: {insights.recommendationRationale.season}
+                      </div>
+                    )}
                   </div>
                   <div style={{ border: '1px solid var(--border-muted)', borderRadius: '12px', padding: '10px' }}>
                     <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>Transfer Strategy</div>
-                    <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '12px', color: 'var(--muted)', display: 'grid', gap: '4px' }}>
-                      {insights.recommendations.transfers.map((item, idx) => <li key={`tf-${idx}`}>{item}</li>)}
-                      {insights.recommendations.transfers.length === 0 && <li>No suggestions</li>}
-                    </ul>
+                    <div style={{ display: 'grid', gap: '8px' }}>
+                      {insights.recommendations.transfers.map((item, idx) => (
+                        <div key={`tf-${idx}`} style={{ border: '1px solid var(--border-muted)', borderRadius: '8px', padding: '8px', display: 'grid', gap: '6px' }}>
+                          <div style={{ fontSize: '12px', color: 'var(--muted)' }}>{item}</div>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              disabled={suggestionActionKey === `note:${item}`}
+                              onClick={() => {
+                                void handleCreateAgentNoteFromSuggestion(item, 'Strategy');
+                              }}
+                            >
+                              {suggestionActionKey === `note:${item}` ? 'Saving...' : 'Add Note'}
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                      {insights.recommendations.transfers.length === 0 && <div style={{ fontSize: '12px', color: 'var(--muted)' }}>No suggestions</div>}
+                    </div>
+                    {insights.recommendationRationale?.transfers && (
+                      <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--muted)' }}>
+                        Why: {insights.recommendationRationale.transfers}
+                      </div>
+                    )}
                   </div>
                   <div style={{ border: '1px solid var(--border-muted)', borderRadius: '12px', padding: '10px' }}>
                     <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>Metrics To Watch</div>
@@ -428,23 +738,44 @@ export const DashboardPage: React.FC = () => {
                     {(Array.isArray(insights.milestoneSuggestions) ? insights.milestoneSuggestions : []).map((s, idx) => {
                       const exists = challengeLabels.has(s.label.trim().toLowerCase());
                       const adding = addingMilestoneLabel === s.label;
+                      const milestoneNote = `${s.label}: target ${s.target} ${s.unit}`;
                       return (
                         <div key={`${s.label}-${idx}`} style={{ border: '1px solid var(--border-muted)', borderRadius: '10px', padding: '9px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                          <div style={{ fontSize: '12px', color: 'var(--muted)' }}>
-                            <strong style={{ color: 'var(--text)' }}>{s.label}</strong> - Target {s.target} {s.unit}
+                          <div style={{ fontSize: '12px', color: 'var(--muted)', display: 'grid', gap: '4px' }}>
+                            <div>
+                              <strong style={{ color: 'var(--text)' }}>{s.label}</strong> - Target {s.target} {s.unit}
+                            </div>
+                            {s.why && (
+                              <div style={{ fontSize: '11px' }}>
+                                Why: {s.why}
+                              </div>
+                            )}
                           </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            icon={<PlusCircle size={12} />}
-                            disabled={exists || adding}
-                            onClick={() => {
-                              void handleAddAiMilestone(s);
-                            }}
-                          >
-                            {exists ? 'Added' : adding ? 'Adding...' : 'Set as Milestone'}
-                          </Button>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              icon={<PlusCircle size={12} />}
+                              disabled={exists || adding}
+                              onClick={() => {
+                                void handleAddAiMilestone(s);
+                              }}
+                            >
+                              {exists ? 'Added' : adding ? 'Adding...' : 'Set as Milestone'}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              disabled={suggestionActionKey === `note:${milestoneNote}`}
+                              onClick={() => {
+                                void handleCreateAgentNoteFromSuggestion(milestoneNote, 'Goal');
+                              }}
+                            >
+                              {suggestionActionKey === `note:${milestoneNote}` ? 'Saving...' : 'Add Note'}
+                            </Button>
+                          </div>
                         </div>
                       );
                     })}
@@ -481,6 +812,11 @@ export const DashboardPage: React.FC = () => {
                           Q: {item.question}
                         </div>
                         <div style={{ fontSize: '12px', lineHeight: 1.55 }}>{item.answer}</div>
+                        {item.why && (
+                          <div style={{ fontSize: '11px', color: 'var(--muted)' }}>
+                            Why: {item.why}
+                          </div>
+                        )}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                           <div style={{ fontSize: '11px', color: 'var(--muted)' }}>
                             {typeof item.confidence === 'number' ? `Confidence ${Math.round(item.confidence * 100)}%` : 'Confidence n/a'}
@@ -491,7 +827,7 @@ export const DashboardPage: React.FC = () => {
                             variant="ghost"
                             size="sm"
                             icon={<Copy size={12} />}
-                            onClick={() => { void copyText(`Q: ${item.question}\n\nA: ${item.answer}`); }}
+                            onClick={() => { void copyText(`Q: ${item.question}\n\nA: ${item.answer}${item.why ? `\n\nWhy: ${item.why}` : ''}`); }}
                           >
                             Copy
                           </Button>
@@ -575,9 +911,34 @@ export const DashboardPage: React.FC = () => {
             return (
               <div key={m.key} style={{ padding: '12px', borderRadius: '12px', background: m.reached ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.02)', border: `1px solid ${m.reached ? 'rgba(34,197,94,0.3)' : 'rgba(34,48,74,0.6)'}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600 }}>{m.label}</span>
+                  <span style={{ fontSize: '12px', fontWeight: 600 }}>
+                    {m.label}
+                    {m.source === 'challenge' && (
+                      <span style={{ marginLeft: '6px', fontSize: '10px', color: 'var(--muted)' }}>custom</span>
+                    )}
+                  </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {m.reached && <span style={{ fontSize: '12px' }}>✅</span>}
+                    {m.source === 'challenge' && m.challengeId && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => openChallengeEditor(m.challengeId)}
+                          title="Edit custom milestone"
+                          style={{ border: 'none', background: 'transparent', color: 'var(--muted)', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center' }}
+                        >
+                          <Pencil size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { void deleteChallengeMilestone(m.challengeId); }}
+                          title="Delete custom milestone"
+                          style={{ border: 'none', background: 'transparent', color: 'var(--muted)', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center' }}
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </>
+                    )}
                     {m.reached && (
                       <button
                         type="button"
@@ -731,6 +1092,44 @@ export const DashboardPage: React.FC = () => {
           ))}
         </div>
       </>)}
+
+      <Modal
+        open={!!editingChallenge}
+        onClose={() => setEditingChallenge(null)}
+        title="Edit Milestone"
+        width="460px"
+        actions={
+          <>
+            <Button type="button" variant="ghost" onClick={() => setEditingChallenge(null)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="green" onClick={() => { void saveChallengeEdit(); }}>
+              Save
+            </Button>
+          </>
+        }
+      >
+        <div style={{ display: 'grid', gap: '10px' }}>
+          <Input
+            label="Label"
+            value={challengeEditForm.label}
+            onChange={(e) => setChallengeEditForm((prev) => ({ ...prev, label: e.target.value }))}
+          />
+          <Input
+            label="Target"
+            type="number"
+            min={1}
+            value={challengeEditForm.target}
+            onChange={(e) => setChallengeEditForm((prev) => ({ ...prev, target: Number(e.target.value) || 1 }))}
+          />
+          <Input
+            label="Unit"
+            value={challengeEditForm.unit}
+            onChange={(e) => setChallengeEditForm((prev) => ({ ...prev, unit: e.target.value }))}
+            placeholder="goals, assists, apps, clean sheets..."
+          />
+        </div>
+      </Modal>
     </div>
   );
 };

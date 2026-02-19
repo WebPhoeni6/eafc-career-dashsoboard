@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTransfersStore } from '../../../store/transfers.store';
 import { PageHeader } from '../../../components/shared/PageHeader';
 import { Button } from '../../../components/ui/Button';
@@ -7,10 +7,18 @@ import { Input } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
 import { Textarea } from '../../../components/ui/Textarea';
 import { Tabs } from '../../../components/ui/Tabs';
-import { ArrowLeftRight, Check, PlusCircle, Trash2, X } from 'lucide-react';
+import { Archive, ArrowLeftRight, Check, PlusCircle, RotateCcw, Trash2, X } from 'lucide-react';
 import { fmtDate, todayISO } from '../../../utils/date';
 import { useToast } from '../../../hooks/useToast';
 import type { TransferOffer, Contract } from '../../../types/transfer.types';
+import { useLocalStorage } from '../../../hooks/useLocalStorage';
+import {
+  OFFER_ROLE_OPTIONS,
+  OFFER_STATUS_OPTIONS,
+  validateContractCloseInput,
+  validateContractStartInput,
+  validateOfferInput,
+} from '../validation';
 
 function scoreOffer(o: Partial<TransferOffer>): number {
   let score = 0;
@@ -90,27 +98,50 @@ export const TransfersPage: React.FC = () => {
   const [noteForm, setNoteForm] = useState(false);
   const [contractForm, setContractForm] = useState(false);
   const [closeContractForm, setCloseContractForm] = useState(false);
+  const [offerStatusFilter, setOfferStatusFilter] = useState<'ALL' | TransferOffer['status']>('ALL');
+  const [selectedOfferIds, setSelectedOfferIds] = useState<string[]>([]);
   const [compactOfferActions, setCompactOfferActions] = useState<boolean>(
     typeof window !== 'undefined' ? window.innerWidth <= 760 : false,
   );
   const [closingContract, setClosingContract] = useState<Contract | null>(null);
 
-  const [ov, setOv] = useState(defaultOffer());
-  const [contractObjectives, setContractObjectives] = useState('');
-  const [wageObjectives, setWageObjectives] = useState('');
-  const [offerNotes, setOfferNotes] = useState('');
+  const [ov, setOv] = useLocalStorage<Omit<TransferOffer, 'id' | 'createdAt'>>(
+    'transfers.offer.draft.v1',
+    defaultOffer(),
+  );
+  const [offerDraftNotes, setOfferDraftNotes] = useLocalStorage<{
+    contractObjectives: string;
+    wageObjectives: string;
+    offerNotes: string;
+  }>('transfers.offer.notes.draft.v1', {
+    contractObjectives: '',
+    wageObjectives: '',
+    offerNotes: '',
+  });
 
   const [noteContent, setNoteContent] = useState('');
   const [noteTag, setNoteTag] = useState<'Strategy' | 'Rumor' | 'Goal' | 'Warning' | 'Other'>('Strategy');
 
-  const [cv, setCv] = useState({
+  const [cv, setCv] = useLocalStorage<{
+    club: string;
+    league: string;
+    startSeason: string;
+    notes: string;
+  }>('transfers.contract.start.draft.v1', {
     club: '',
     league: '',
     startSeason: '',
     notes: '',
   });
 
-  const [closeCv, setCloseCv] = useState({
+  const [closeCv, setCloseCv] = useLocalStorage<{
+    endSeason: string;
+    apps: number;
+    goals: number;
+    assists: number;
+    avgRating: number;
+    notes: string;
+  }>('transfers.contract.close.draft.v1', {
     endSeason: '',
     apps: 0,
     goals: 0,
@@ -118,6 +149,16 @@ export const TransfersPage: React.FC = () => {
     avgRating: 0,
     notes: '',
   });
+
+  const activeContract = useMemo(() => contracts.find((c) => c.endSeason === 'Active') ?? null, [contracts]);
+  const filteredOffers = useMemo(
+    () => offers.filter((o) => offerStatusFilter === 'ALL' || o.status === offerStatusFilter),
+    [offers, offerStatusFilter],
+  );
+  const selectedOffers = useMemo(
+    () => offers.filter((o) => selectedOfferIds.includes(o.id)),
+    [offers, selectedOfferIds],
+  );
 
   const statusColor: Record<string, string> = {
     Pending: '#f59e0b',
@@ -145,6 +186,51 @@ export const TransfersPage: React.FC = () => {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  useEffect(() => {
+    setSelectedOfferIds((prev) => prev.filter((id) => offers.some((offer) => offer.id === id)));
+  }, [offers]);
+
+  const setContractObjectives = (value: string) => {
+    setOfferDraftNotes((prev) => ({ ...prev, contractObjectives: value }));
+  };
+
+  const setWageObjectives = (value: string) => {
+    setOfferDraftNotes((prev) => ({ ...prev, wageObjectives: value }));
+  };
+
+  const setOfferNotes = (value: string) => {
+    setOfferDraftNotes((prev) => ({ ...prev, offerNotes: value }));
+  };
+
+  const clearOfferDraft = () => {
+    setOv(defaultOffer());
+    setOfferDraftNotes({
+      contractObjectives: '',
+      wageObjectives: '',
+      offerNotes: '',
+    });
+  };
+
+  const clearContractStartDraft = () => {
+    setCv({
+      club: '',
+      league: '',
+      startSeason: '',
+      notes: '',
+    });
+  };
+
+  const clearContractCloseDraft = () => {
+    setCloseCv({
+      endSeason: '',
+      apps: 0,
+      goals: 0,
+      assists: 0,
+      avgRating: 0,
+      notes: '',
+    });
+  };
+
   const openCloseContractModal = (contract: Contract) => {
     setClosingContract(contract);
     setCloseCv({
@@ -158,6 +244,74 @@ export const TransfersPage: React.FC = () => {
     setCloseContractForm(true);
   };
 
+  const isOfferSelected = (id: string) => selectedOfferIds.includes(id);
+
+  const toggleOfferSelected = (id: string) => {
+    setSelectedOfferIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+  };
+
+  const toggleSelectAllVisible = () => {
+    const visibleIds = filteredOffers.map((o) => o.id);
+    const allVisibleSelected = visibleIds.every((id) => selectedOfferIds.includes(id));
+    if (allVisibleSelected) {
+      setSelectedOfferIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
+      return;
+    }
+    setSelectedOfferIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
+  };
+
+  const updateOfferStatus = async (offerId: string, status: TransferOffer['status']) => {
+    const payload: Partial<TransferOffer> = {
+      status,
+      decisionDate: status === 'Pending' ? '' : todayISO(),
+    };
+    await updateOffer(offerId, payload);
+  };
+
+  const handleBulkArchive = async () => {
+    const targets = selectedOffers.filter((o) => o.status !== 'Expired');
+    if (!targets.length) {
+      toast('No selected offers to archive', 'default');
+      return;
+    }
+    try {
+      await Promise.all(targets.map((o) => updateOfferStatus(o.id, 'Expired')));
+      toast(`Archived ${targets.length} offer${targets.length > 1 ? 's' : ''}`, 'success');
+      setSelectedOfferIds([]);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to archive selected offers', 'error');
+    }
+  };
+
+  const handleBulkReopen = async () => {
+    const targets = selectedOffers.filter((o) => o.status !== 'Pending');
+    if (!targets.length) {
+      toast('No selected offers to reopen', 'default');
+      return;
+    }
+    try {
+      await Promise.all(targets.map((o) => updateOfferStatus(o.id, 'Pending')));
+      toast(`Reopened ${targets.length} offer${targets.length > 1 ? 's' : ''}`, 'success');
+      setSelectedOfferIds([]);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to reopen selected offers', 'error');
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!selectedOffers.length) {
+      toast('No selected offers to delete', 'default');
+      return;
+    }
+    try {
+      await Promise.all(selectedOffers.map((o) => deleteOffer(o.id)));
+      toast(`Deleted ${selectedOffers.length} offer${selectedOffers.length > 1 ? 's' : ''}`, 'default');
+      setSelectedOfferIds([]);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to delete selected offers', 'error');
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
       <PageHeader
@@ -169,7 +323,19 @@ export const TransfersPage: React.FC = () => {
             <Button variant="green" size="sm" icon={<PlusCircle size={13} />} onClick={() => setOfferForm(true)}>
               Add Offer
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setContractForm(true)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (activeContract) {
+                  toast('Close your active contract before logging a new one', 'error');
+                  return;
+                }
+                setContractForm(true);
+              }}
+              disabled={!!activeContract}
+              title={activeContract ? `Active contract at ${activeContract.club}` : 'Log a new contract'}
+            >
               Log Contract
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setNoteForm(true)}>
@@ -191,14 +357,71 @@ export const TransfersPage: React.FC = () => {
             {tab === 'offers' &&
               card(
                 <>
-                  <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '14px' }}>Transfer Offers</div>
-                  {offers.length === 0 ? (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '14px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 700 }}>Transfer Offers</div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <div style={{ minWidth: '170px' }}>
+                        <Select
+                          value={offerStatusFilter}
+                          onChange={(e) => setOfferStatusFilter(e.target.value as 'ALL' | TransferOffer['status'])}
+                          options={[
+                            { value: 'ALL', label: 'All statuses' },
+                            ...OFFER_STATUS_OPTIONS.map((status) => ({ value: status, label: status })),
+                          ]}
+                        />
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={toggleSelectAllVisible}
+                        disabled={filteredOffers.length === 0}
+                      >
+                        {filteredOffers.length > 0 && filteredOffers.every((offer) => isOfferSelected(offer.id))
+                          ? 'Unselect visible'
+                          : 'Select visible'}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {selectedOffers.length > 0 && (
+                    <div
+                      style={{
+                        marginBottom: '12px',
+                        padding: '10px',
+                        borderRadius: '12px',
+                        border: '1px solid var(--border-muted)',
+                        background: 'rgba(255,255,255,0.03)',
+                        display: 'flex',
+                        gap: '8px',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <span style={{ fontSize: '12px', color: 'var(--muted)' }}>
+                        {selectedOffers.length} selected
+                      </span>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <Button size="sm" variant="ghost" icon={<Archive size={12} />} onClick={() => { void handleBulkArchive(); }}>
+                          Archive
+                        </Button>
+                        <Button size="sm" variant="ghost" icon={<RotateCcw size={12} />} onClick={() => { void handleBulkReopen(); }}>
+                          Reopen
+                        </Button>
+                        <Button size="sm" variant="danger" icon={<Trash2 size={12} />} onClick={() => { void handleBulkDelete(); }}>
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {filteredOffers.length === 0 ? (
                     <div style={{ color: 'var(--muted)', textAlign: 'center', padding: '20px', fontSize: '13px' }}>
-                      No offers received yet.
+                      {offers.length === 0 ? 'No offers received yet.' : 'No offers match this filter.'}
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {offers.map((o) => {
+                      {filteredOffers.map((o) => {
                         const parsed = parseOfferNotes(o.notes);
                         return (
                           <div
@@ -214,6 +437,14 @@ export const TransfersPage: React.FC = () => {
                               flexWrap: 'wrap',
                             }}
                           >
+                            <div style={{ paddingTop: '2px' }}>
+                              <input
+                                type="checkbox"
+                                checked={isOfferSelected(o.id)}
+                                onChange={() => toggleOfferSelected(o.id)}
+                                aria-label={`Select offer from ${o.club}`}
+                              />
+                            </div>
                             <div style={{ flex: '1 1 260px', minWidth: 0 }}>
                               <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '6px' }}>
                                 <span style={{ fontWeight: 700, fontSize: '14px' }}>{o.club}</span>
@@ -275,9 +506,13 @@ export const TransfersPage: React.FC = () => {
                                   <Button
                                     size="sm"
                                     variant="green"
-                                    onClick={() => {
-                                      updateOffer(o.id, { status: 'Accepted' });
-                                      toast('Offer accepted', 'success');
+                                    onClick={async () => {
+                                      try {
+                                        await updateOfferStatus(o.id, 'Accepted');
+                                        toast('Offer accepted', 'success');
+                                      } catch (err) {
+                                        toast(err instanceof Error ? err.message : 'Failed to update offer', 'error');
+                                      }
                                     }}
                                     icon={compactOfferActions ? <Check size={12} /> : undefined}
                                     title="Accept offer"
@@ -287,8 +522,13 @@ export const TransfersPage: React.FC = () => {
                                   <Button
                                     size="sm"
                                     variant="danger"
-                                    onClick={() => {
-                                      updateOffer(o.id, { status: 'Rejected' });
+                                    onClick={async () => {
+                                      try {
+                                        await updateOfferStatus(o.id, 'Rejected');
+                                        toast('Offer rejected', 'default');
+                                      } catch (err) {
+                                        toast(err instanceof Error ? err.message : 'Failed to update offer', 'error');
+                                      }
                                     }}
                                     icon={compactOfferActions ? <X size={12} /> : undefined}
                                     title="Reject offer"
@@ -297,11 +537,35 @@ export const TransfersPage: React.FC = () => {
                                   </Button>
                                 </>
                               )}
+                              {o.status !== 'Pending' && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={async () => {
+                                    try {
+                                      await updateOfferStatus(o.id, 'Pending');
+                                      toast('Offer reopened', 'success');
+                                    } catch (err) {
+                                      toast(err instanceof Error ? err.message : 'Failed to update offer', 'error');
+                                    }
+                                  }}
+                                  icon={compactOfferActions ? <RotateCcw size={12} /> : undefined}
+                                  title="Reopen offer"
+                                >
+                                  {compactOfferActions ? '' : 'Reopen'}
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
                                 variant="ghost"
                                 icon={<Trash2 size={11} />}
-                                onClick={() => deleteOffer(o.id)}
+                                onClick={async () => {
+                                  try {
+                                    await deleteOffer(o.id);
+                                  } catch (err) {
+                                    toast(err instanceof Error ? err.message : 'Failed to delete offer', 'error');
+                                  }
+                                }}
                               />
                             </div>
                           </div>
@@ -315,7 +579,18 @@ export const TransfersPage: React.FC = () => {
             {tab === 'contracts' &&
               card(
                 <>
-                  <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '14px' }}>Contract History</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 700 }}>Contract History</div>
+                    {activeContract ? (
+                      <div style={{ fontSize: '12px', color: '#22c55e' }}>
+                        Active contract: <strong>{activeContract.club}</strong> ({activeContract.startSeason} - Present)
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '12px', color: 'var(--muted)' }}>
+                        No active contract. You can log a new one.
+                      </div>
+                    )}
+                  </div>
                   {contracts.length === 0 ? (
                     <div style={{ color: 'var(--muted)', textAlign: 'center', padding: '20px', fontSize: '13px' }}>
                       No contracts logged yet.
@@ -435,28 +710,37 @@ export const TransfersPage: React.FC = () => {
             </Button>
             <Button
               variant="green"
-              onClick={() => {
+              onClick={async () => {
+                const payload = {
+                  ...ov,
+                  fee: ov.fee.trim() || 'N/A',
+                };
+                const validationError = validateOfferInput(payload);
+                if (validationError) {
+                  toast(validationError, 'error');
+                  return;
+                }
+
                 const mergedNotes = [
-                  contractObjectives.trim() ? `Contract objectives: ${contractObjectives.trim()}` : '',
-                  wageObjectives.trim() ? `Wage objectives: ${wageObjectives.trim()}` : '',
-                  offerNotes.trim() ? `Notes: ${offerNotes.trim()}` : '',
+                  offerDraftNotes.contractObjectives.trim() ? `Contract objectives: ${offerDraftNotes.contractObjectives.trim()}` : '',
+                  offerDraftNotes.wageObjectives.trim() ? `Wage objectives: ${offerDraftNotes.wageObjectives.trim()}` : '',
+                  offerDraftNotes.offerNotes.trim() ? `Notes: ${offerDraftNotes.offerNotes.trim()}` : '',
                 ]
                   .filter(Boolean)
                   .join('\n');
 
-                addOffer({
-                  ...ov,
-                  fee: ov.fee.trim() || 'N/A',
-                  notes: mergedNotes,
-                  score: scoreOffer(ov),
-                });
-
-                setOfferForm(false);
-                setOv(defaultOffer());
-                setContractObjectives('');
-                setWageObjectives('');
-                setOfferNotes('');
-                toast('Offer added', 'success');
+                try {
+                  await addOffer({
+                    ...payload,
+                    notes: mergedNotes,
+                    score: scoreOffer(ov),
+                  });
+                  setOfferForm(false);
+                  clearOfferDraft();
+                  toast('Offer added', 'success');
+                } catch (err) {
+                  toast(err instanceof Error ? err.message : 'Failed to add offer', 'error');
+                }
               }}
             >
               Add
@@ -489,7 +773,7 @@ export const TransfersPage: React.FC = () => {
               label="Role"
               value={ov.role}
               onChange={(e) => setOv((v) => ({ ...v, role: e.target.value as TransferOffer['role'] }))}
-              options={['Crucial', 'Important', 'Rotation', 'Bench'].map((r) => ({ value: r, label: r }))}
+              options={OFFER_ROLE_OPTIONS.map((r) => ({ value: r, label: r }))}
             />
             <label
               style={{
@@ -539,22 +823,27 @@ export const TransfersPage: React.FC = () => {
 
           <Textarea
             label="Contract Objectives"
-            value={contractObjectives}
+            value={offerDraftNotes.contractObjectives}
             onChange={(e) => setContractObjectives(e.target.value)}
             placeholder="Reach mandatory objectives to be eligible for this contract."
           />
           <Textarea
             label="Wage Objectives"
-            value={wageObjectives}
+            value={offerDraftNotes.wageObjectives}
             onChange={(e) => setWageObjectives(e.target.value)}
             placeholder="Reach optional wage objectives to receive your requested weekly wage."
           />
           <Textarea
             label="Additional Notes"
-            value={offerNotes}
+            value={offerDraftNotes.offerNotes}
             onChange={(e) => setOfferNotes(e.target.value)}
             placeholder="Any extra context about this offer."
           />
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Button type="button" size="sm" variant="ghost" onClick={clearOfferDraft}>
+              Discard Offer Draft
+            </Button>
+          </div>
         </div>
       </Modal>
 
@@ -570,10 +859,19 @@ export const TransfersPage: React.FC = () => {
             </Button>
             <Button
               variant="green"
-              onClick={() => {
-                addAgentNote({ date: todayISO(), content: noteContent, tag: noteTag });
-                setNoteForm(false);
-                toast('Note added', 'success');
+              onClick={async () => {
+                if (!noteContent.trim()) {
+                  toast('Note content is required', 'error');
+                  return;
+                }
+                try {
+                  await addAgentNote({ date: todayISO(), content: noteContent.trim(), tag: noteTag });
+                  setNoteForm(false);
+                  setNoteContent('');
+                  toast('Note added', 'success');
+                } catch (err) {
+                  toast(err instanceof Error ? err.message : 'Failed to add note', 'error');
+                }
               }}
             >
               Add
@@ -613,8 +911,13 @@ export const TransfersPage: React.FC = () => {
             <Button
               variant="green"
               onClick={async () => {
-                if (!cv.club.trim() || !cv.league.trim() || !cv.startSeason.trim()) {
-                  toast('Club, league, and start season are required', 'error');
+                if (activeContract) {
+                  toast('Close your active contract before logging a new one', 'error');
+                  return;
+                }
+                const validationError = validateContractStartInput(cv);
+                if (validationError) {
+                  toast(validationError, 'error');
                   return;
                 }
                 try {
@@ -625,7 +928,7 @@ export const TransfersPage: React.FC = () => {
                     notes: cv.notes.trim(),
                   });
                   setContractForm(false);
-                  setCv({ club: '', league: '', startSeason: '', notes: '' });
+                  clearContractStartDraft();
                   toast('Contract logged', 'success');
                 } catch (err) {
                   toast(err instanceof Error ? err.message : 'Failed to log contract', 'error');
@@ -656,6 +959,11 @@ export const TransfersPage: React.FC = () => {
             End season and match stats are logged later with the <strong style={{ color: 'var(--text)' }}>Close</strong> action on this contract.
           </div>
           <Textarea label="Notes" value={cv.notes} onChange={(e) => setCv((v) => ({ ...v, notes: e.target.value }))} />
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Button type="button" size="sm" variant="ghost" onClick={clearContractStartDraft}>
+              Discard Contract Draft
+            </Button>
+          </div>
         </div>
       </Modal>
 
@@ -682,8 +990,9 @@ export const TransfersPage: React.FC = () => {
               variant="green"
               onClick={async () => {
                 if (!closingContract) return;
-                if (!closeCv.endSeason.trim()) {
-                  toast('End season is required', 'error');
+                const validationError = validateContractCloseInput(closeCv);
+                if (validationError) {
+                  toast(validationError, 'error');
                   return;
                 }
                 try {
@@ -697,6 +1006,7 @@ export const TransfersPage: React.FC = () => {
                   });
                   setCloseContractForm(false);
                   setClosingContract(null);
+                  clearContractCloseDraft();
                   toast('Contract closed', 'success');
                 } catch (err) {
                   toast(err instanceof Error ? err.message : 'Failed to close contract', 'error');
@@ -743,6 +1053,11 @@ export const TransfersPage: React.FC = () => {
             />
           </div>
           <Textarea label="Notes" value={closeCv.notes} onChange={(e) => setCloseCv((v) => ({ ...v, notes: e.target.value }))} />
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Button type="button" size="sm" variant="ghost" onClick={clearContractCloseDraft}>
+              Discard Close Draft
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>

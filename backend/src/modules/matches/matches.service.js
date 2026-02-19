@@ -336,20 +336,54 @@ async function analyzePerformance(userId, careerId, files) {
     throw new AppError('At least one image is required', 400, 'BAD_REQUEST');
   }
 
-  const raw = await ai.analyzeWithAI(files);
-  const suggestedRaw =
+  const startedAt = Date.now();
+  let raw;
+  let pipeline = 'GENERIC_AI';
+
+  try {
+    raw = await ai.analyzeWithEAFCQuick(files);
+    pipeline = raw?._pipeline || 'EAFC_QUICK';
+  } catch (_) {
+    raw = null;
+  }
+
+  let suggestedRaw =
     raw && typeof raw === 'object' && raw.suggested && typeof raw.suggested === 'object'
       ? raw.suggested
       : raw;
-  const suggested = sanitizeSuggestedMatchFields(suggestedRaw);
+  let suggested = sanitizeSuggestedMatchFields(suggestedRaw);
+  const confidenceValue = toNumber(raw?.confidence);
+  let confidence =
+    typeof confidenceValue === 'number' ? clamp(confidenceValue, 0, 1) : null;
+
+  const shouldFallbackToGeneric =
+    !raw ||
+    Object.keys(suggested).length < 7 ||
+    (typeof confidence === 'number' && confidence < 0.58);
+
+  if (shouldFallbackToGeneric) {
+    const genericRaw = await ai.analyzeWithAI(files);
+    const genericSuggestedRaw =
+      genericRaw && typeof genericRaw === 'object' && genericRaw.suggested && typeof genericRaw.suggested === 'object'
+        ? genericRaw.suggested
+        : genericRaw;
+    const genericSuggested = sanitizeSuggestedMatchFields(genericSuggestedRaw);
+    const genericConfidenceValue = toNumber(genericRaw?.confidence);
+    const genericConfidence =
+      typeof genericConfidenceValue === 'number' ? clamp(genericConfidenceValue, 0, 1) : null;
+
+    if (!raw || Object.keys(genericSuggested).length >= Object.keys(suggested).length) {
+      raw = genericRaw;
+      suggestedRaw = genericSuggestedRaw;
+      suggested = genericSuggested;
+      confidence = genericConfidence;
+      pipeline = 'GENERIC_AI';
+    }
+  }
 
   if (Object.keys(suggested).length === 0) {
     throw new AppError('No match details could be extracted from image(s)', 422, 'ANALYSIS_EMPTY');
   }
-
-  const confidenceValue = toNumber(raw?.confidence);
-  const confidence =
-    typeof confidenceValue === 'number' ? clamp(confidenceValue, 0, 1) : null;
 
   return {
     suggested,
@@ -357,6 +391,12 @@ async function analyzePerformance(userId, careerId, files) {
     missingFields: sanitizeStringList(raw?.missingFields),
     warnings: sanitizeStringList(raw?.warnings),
     summary: normalizeString(raw?.summary),
+    pipeline,
+    durationMs: Date.now() - startedAt,
+    imagesProcessed:
+      pipeline === 'EAFC_QUICK'
+        ? Array.isArray(files) ? Math.min(files.length, 2) : 0
+        : Array.isArray(files) ? files.length : 0,
   };
 }
 

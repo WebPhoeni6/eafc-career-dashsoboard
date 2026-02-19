@@ -51,7 +51,7 @@ const updateOfferSchema = z.object({
       hasUCL: z.boolean().optional(),
       status: statusEnum.optional(),
       receivedDate: z.string().optional(),
-      decisionDate: z.string().optional(),
+      decisionDate: z.string().optional().nullable().or(z.literal('')),
       notes: z.string().optional(),
       score: z.number().int().min(0).max(100).optional(),
     })

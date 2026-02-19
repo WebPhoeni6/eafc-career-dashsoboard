@@ -17,6 +17,15 @@ function mapAgentNote(item) {
   };
 }
 
+function normalizeOfferDates(input) {
+  const out = { ...input };
+  if ('decisionDate' in out) {
+    const value = typeof out.decisionDate === 'string' ? out.decisionDate.trim() : out.decisionDate;
+    out.decisionDate = value || null;
+  }
+  return out;
+}
+
 function normalizeContractCreateInput(input) {
   return {
     club: String(input.club || '').trim(),
@@ -59,10 +68,11 @@ async function listOffers(userId, careerId) {
 
 async function createOffer(userId, careerId, input) {
   await assertCareerOwnership(careerId, userId);
+  const normalized = normalizeOfferDates(input);
   const row = await repo.offer.create({
     careerId,
-    ...input,
-    decisionDate: input.decisionDate || null,
+    ...normalized,
+    decisionDate: normalized.decisionDate || null,
     ...(input.createdAt ? { createdAt: new Date(input.createdAt) } : {}),
   });
   return mapOffer(row);
@@ -70,7 +80,11 @@ async function createOffer(userId, careerId, input) {
 
 async function updateOffer(userId, careerId, id, input) {
   await assertCareerOwnership(careerId, userId);
-  const result = await repo.offer.update(careerId, id, input);
+  const normalized = normalizeOfferDates(input);
+  if (normalized.status === 'Pending' && !('decisionDate' in normalized)) {
+    normalized.decisionDate = null;
+  }
+  const result = await repo.offer.update(careerId, id, normalized);
   if (!result.count) throw new AppError('Offer not found', 404, 'NOT_FOUND');
   const rows = await repo.offer.list(careerId);
   return mapOffer(rows.find((row) => row.id === id));
@@ -89,6 +103,10 @@ async function listContracts(userId, careerId) {
 
 async function createContract(userId, careerId, input) {
   await assertCareerOwnership(careerId, userId);
+  const existing = await repo.contract.list(careerId);
+  if (existing.some((c) => c.endSeason === 'Active')) {
+    throw new AppError('You already have an active contract. Close it before starting a new one.', 400, 'CONTRACT_ACTIVE');
+  }
   return repo.contract.create({ careerId, ...normalizeContractCreateInput(input) });
 }
 

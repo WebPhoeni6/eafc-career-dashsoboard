@@ -42,6 +42,30 @@ function asTextList(value, maxItems = 6) {
     .slice(0, maxItems);
 }
 
+function asOptionalText(value, maxLength = 320) {
+  if (typeof value !== 'string') return '';
+  const clean = value.trim();
+  if (!clean) return '';
+  return clean.slice(0, maxLength);
+}
+
+function asRecommendationRationale(value) {
+  if (!value || typeof value !== 'object') {
+    return {
+      nextMatch: '',
+      training: '',
+      season: '',
+      transfers: '',
+    };
+  }
+  return {
+    nextMatch: asOptionalText(value.nextMatch),
+    training: asOptionalText(value.training),
+    season: asOptionalText(value.season),
+    transfers: asOptionalText(value.transfers),
+  };
+}
+
 function asMilestoneSuggestions(value, maxItems = 4) {
   if (!Array.isArray(value)) return [];
   const out = [];
@@ -52,7 +76,12 @@ function asMilestoneSuggestions(value, maxItems = 4) {
     const targetRaw = Number(item.target);
     const target = Number.isFinite(targetRaw) ? Math.round(targetRaw) : 0;
     if (!label || !unit || target <= 0) continue;
-    out.push({ label, unit, target: clamp(target, 1, 500) });
+    out.push({
+      label,
+      unit,
+      target: clamp(target, 1, 500),
+      why: asOptionalText(item.why),
+    });
     if (out.length >= maxItems) break;
   }
   return out;
@@ -305,6 +334,7 @@ async function getPerformanceInsights(userId, id, options = {}) {
       season: asTextList(recommendations.season, 6),
       transfers: asTextList(recommendations.transfers, 6),
     },
+    recommendationRationale: asRecommendationRationale(raw?.recommendationRationale),
     milestoneSuggestions: asMilestoneSuggestions(raw?.milestoneSuggestions, 4),
     keyMetricsToWatch: asTextList(raw?.keyMetricsToWatch, 8),
     recentFormSnapshot: typeof raw?.recentFormSnapshot === 'string' ? raw.recentFormSnapshot.trim() : '',
@@ -336,6 +366,7 @@ async function askPerformanceInsightsQuestion(userId, id, options = {}) {
   return {
     question,
     answer,
+    why: asOptionalText(raw?.why),
     confidence: Number.isFinite(confidenceValue) ? clamp(confidenceValue, 0, 1) : null,
     recentMatchesConsidered: context.recentWindow.count,
     generatedAt: new Date().toISOString(),

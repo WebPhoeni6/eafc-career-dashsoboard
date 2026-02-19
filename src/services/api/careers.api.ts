@@ -29,10 +29,17 @@ export interface CareerPerformanceInsights {
     season: string[];
     transfers: string[];
   };
+  recommendationRationale?: {
+    nextMatch?: string;
+    training?: string;
+    season?: string;
+    transfers?: string;
+  };
   milestoneSuggestions: {
     label: string;
     target: number;
     unit: string;
+    why?: string;
   }[];
   keyMetricsToWatch: string[];
   recentFormSnapshot: string;
@@ -43,6 +50,7 @@ export interface CareerPerformanceInsights {
 export interface CareerPerformanceQuestionResponse {
   question: string;
   answer: string;
+  why?: string;
   confidence: number | null;
   recentMatchesConsidered: number;
   generatedAt: string;

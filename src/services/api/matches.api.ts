@@ -19,6 +19,9 @@ export interface MatchAnalysisResult {
   missingFields: string[];
   warnings: string[];
   summary: string;
+  pipeline?: 'EAFC_QUICK' | 'GENERIC_AI' | string;
+  durationMs?: number;
+  imagesProcessed?: number;
 }
 
 function toQueryString(query?: ListMatchesQuery): string {

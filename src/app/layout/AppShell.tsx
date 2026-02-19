@@ -102,6 +102,7 @@ export const AppShell: React.FC = () => {
   const toast = useToast((s) => s.show);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const analysisInputRef = useRef<HTMLInputElement | null>(null);
+  const snapInputRef = useRef<HTMLInputElement | null>(null);
   const analysisCacheRef = useRef<Map<string, MatchAnalysisResult>>(new Map());
 
   const resetNewMatchState = () => {
@@ -336,6 +337,12 @@ export const AppShell: React.FC = () => {
     void processSelectedFiles(files, false);
   };
 
+  const handleSnapFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
+    void processSelectedFiles(files, true);
+  };
+
   return (
     <div className="app-shell">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -361,18 +368,17 @@ export const AppShell: React.FC = () => {
               <MatchForm
                 prefill={matchPrefill}
                 prefillVersion={prefillVersion}
-                onSubmit={(values) => {
-                  void handleAddMatch(values);
-                }}
+                draftKey="matches.manual.draft.v1"
+                onSubmit={handleAddMatch}
                 onCancel={closeNewMatchModal}
               />
             ) : (
               <div style={{ display: 'grid', gap: '14px' }}>
                 <p style={{ margin: 0, fontSize: '13px', color: 'var(--muted)' }}>
-                  Upload screenshots (or paste from clipboard). The AI extracts visible fields and prefills the manual form.
+                  Snap from camera, upload images, or paste from clipboard. The EAFC quick OCR pipeline extracts visible fields and prefills the manual form.
                 </p>
                 <p style={{ margin: 0, fontSize: '12px', color: 'var(--muted)' }}>
-                  Fastest flow: use screenshots from your console/PC, not phone photos.
+                  Camera snap avoids creating extra screenshot files in your gallery.
                 </p>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
@@ -384,6 +390,17 @@ export const AppShell: React.FC = () => {
                     style={{ display: 'none' }}
                     onChange={handleSelectFiles}
                   />
+                  <input
+                    ref={snapInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    style={{ display: 'none' }}
+                    onChange={handleSnapFile}
+                  />
+                  <Button type="button" variant="green" size="sm" onClick={() => snapInputRef.current?.click()} disabled={processingImages}>
+                    Snap Match Performance
+                  </Button>
                   <Button type="button" variant="ghost" size="sm" onClick={() => analysisInputRef.current?.click()} disabled={processingImages}>
                     Choose Images
                   </Button>
@@ -423,6 +440,13 @@ export const AppShell: React.FC = () => {
                     )}
                     {analysisResult.summary && (
                       <div style={{ fontSize: '12px', color: 'var(--muted)' }}>{analysisResult.summary}</div>
+                    )}
+                    {(analysisResult.pipeline || analysisResult.durationMs) && (
+                      <div style={{ fontSize: '12px', color: 'var(--muted)' }}>
+                        Pipeline: <strong style={{ color: 'var(--text)' }}>{analysisResult.pipeline === 'EAFC_QUICK' ? 'EAFC Quick OCR' : 'Generic AI Vision'}</strong>
+                        {typeof analysisResult.durationMs === 'number' ? ` • ${analysisResult.durationMs}ms` : ''}
+                        {typeof analysisResult.imagesProcessed === 'number' ? ` • ${analysisResult.imagesProcessed} image(s)` : ''}
+                      </div>
                     )}
                     {analysisResult.missingFields.length > 0 && (
                       <div style={{ fontSize: '12px', color: 'var(--muted)' }}>
