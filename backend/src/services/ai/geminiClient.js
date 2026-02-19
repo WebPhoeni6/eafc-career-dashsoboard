@@ -102,17 +102,90 @@ function addCandidate(list, raw) {
   if (!list.includes(value)) list.push(value);
 }
 
-function tryParseJson(candidate) {
-  try {
-    return JSON.parse(candidate);
-  } catch (_) {
-    // try a common malformed pattern from LLMs (trailing commas)
-    const cleaned = candidate.replace(/,\s*([}\]])/g, '$1');
-    if (cleaned !== candidate) {
-      return JSON.parse(cleaned);
+function escapeControlCharsInStrings(input) {
+  const text = String(input || '');
+  let inString = false;
+  let escaped = false;
+  let out = '';
+
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+
+    if (inString) {
+      if (escaped) {
+        out += ch;
+        escaped = false;
+        continue;
+      }
+
+      if (ch === '\\') {
+        out += ch;
+        escaped = true;
+        continue;
+      }
+
+      if (ch === '"') {
+        out += ch;
+        inString = false;
+        continue;
+      }
+
+      if (ch === '\n') {
+        out += '\\n';
+        continue;
+      }
+      if (ch === '\r') {
+        out += '\\r';
+        continue;
+      }
+      if (ch === '\t') {
+        out += '\\t';
+        continue;
+      }
+
+      out += ch;
+      continue;
     }
-    throw _;
+
+    if (ch === '"') {
+      out += ch;
+      inString = true;
+      continue;
+    }
+
+    out += ch;
   }
+
+  return out;
+}
+
+function normalizeJsonLikeText(input) {
+  return escapeControlCharsInStrings(
+    String(input || '')
+      .replace(/\u201C|\u201D/g, '"')
+      .replace(/\u2018|\u2019/g, "'"),
+  );
+}
+
+function tryParseJson(candidate) {
+  const variants = [];
+  addCandidate(variants, candidate);
+
+  const normalized = normalizeJsonLikeText(candidate);
+  addCandidate(variants, normalized);
+  addCandidate(variants, normalized.replace(/,\s*([}\]])/g, '$1'));
+  addCandidate(variants, String(candidate || '').replace(/,\s*([}\]])/g, '$1'));
+
+  let lastErr = null;
+  for (const variant of variants) {
+    try {
+      return JSON.parse(variant);
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+
+  throw lastErr || new Error('Invalid JSON');
 }
 
 function parseJsonFromText(text) {
@@ -137,16 +210,20 @@ function parseJsonFromText(text) {
 
   addCandidate(candidates, extractBalancedJsonSnippet(candidate));
 
+  let lastParseError = null;
   for (const item of candidates) {
     try {
       return tryParseJson(item);
-    } catch (_) {
+    } catch (err) {
+      lastParseError = err;
       // try next candidate
     }
   }
 
   throw new AppError('AI response could not be parsed as JSON', 502, 'AI_PARSE_ERROR', {
     preview: previewText(source),
+    parseError: lastParseError instanceof Error ? lastParseError.message : 'Invalid JSON',
+    textLength: source.length,
   });
 }
 
@@ -298,6 +375,7 @@ async function runJsonPrompt({ systemInstruction, prompt, schema, fixPromptSuffi
         attempt: attempt.label,
         stage: 'parse',
         message: err instanceof Error ? err.message : 'JSON parse failed',
+        details: err?.details || null,
         preview: previewText(rawText),
       });
       continue;
