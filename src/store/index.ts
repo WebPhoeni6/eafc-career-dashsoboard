@@ -4,3 +4,4 @@ export { useSeasonsStore } from './seasons.store';
 export { useSkillsStore } from './skills.store';
 export { useTransfersStore } from './transfers.store';
 export { useSessionStore } from './session.store';
+export { useCareerDirectorStore } from './careerDirector.store';

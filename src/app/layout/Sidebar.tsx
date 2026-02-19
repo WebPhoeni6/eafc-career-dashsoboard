@@ -8,10 +8,12 @@ import {
   Dumbbell,
   ArrowLeftRight,
   Globe2,
+  Brain,
   User,
   Settings,
 } from 'lucide-react';
 import crest from '../../assets/brand/crest.svg';
+import { useCareerStore } from '../../store/career.store';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -30,8 +32,12 @@ interface SidebarProps {
   onClose: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => (
-  <>
+export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
+  const activeCareerId = useCareerStore((s) => s.activeCareerId);
+  const directorTo = activeCareerId ? `/career/${activeCareerId}/career-director` : '/careers';
+
+  return (
+    <>
     <div className={`app-sidebar-backdrop ${isOpen ? 'is-open' : ''}`} onClick={onClose} aria-hidden={!isOpen} />
 
     <aside className={`app-sidebar ${isOpen ? 'is-open' : ''}`} aria-label="Primary Navigation">
@@ -73,6 +79,29 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => (
             {label}
           </NavLink>
         ))}
+        <NavLink
+          to={directorTo}
+          onClick={onClose}
+          style={({ isActive }) => ({
+            display: 'flex',
+            alignItems: 'center',
+            gap: '11px',
+            padding: '10px 13px',
+            borderRadius: '12px',
+            color: isActive ? 'var(--text)' : 'var(--muted)',
+            background: isActive
+              ? 'linear-gradient(90deg, rgba(16,185,129,0.24), rgba(20,184,166,0.15))'
+              : 'transparent',
+            border: isActive ? '1px solid var(--border)' : '1px solid transparent',
+            fontWeight: isActive ? 700 : 500,
+            fontSize: '13px',
+            transition: 'all var(--transition)',
+            textDecoration: 'none',
+          })}
+        >
+          <Brain size={16} />
+          Career Director
+        </NavLink>
       </nav>
 
       <div
@@ -86,5 +115,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => (
         v2.1.0 - Cloud Sync Ready
       </div>
     </aside>
-  </>
-);
+    </>
+  );
+};

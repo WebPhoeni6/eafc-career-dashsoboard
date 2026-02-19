@@ -9,6 +9,7 @@ import { useMatchesStore } from './matches.store';
 import { useSeasonsStore } from './seasons.store';
 import { useSkillsStore } from './skills.store';
 import { useTransfersStore } from './transfers.store';
+import { useCareerDirectorStore } from './careerDirector.store';
 
 interface SessionState {
   user: AuthUser | null;
@@ -33,6 +34,7 @@ async function hydrateCareerData(): Promise<void> {
     useSeasonsStore.getState().resetState();
     useSkillsStore.getState().resetState();
     useTransfersStore.getState().resetState();
+    useCareerDirectorStore.getState().resetState();
     useCareerStore.getState().resetProfileState();
     return;
   }
@@ -52,6 +54,7 @@ function clearAllDomainStores(): void {
   useSeasonsStore.getState().resetState();
   useSkillsStore.getState().resetState();
   useTransfersStore.getState().resetState();
+  useCareerDirectorStore.getState().resetState();
 }
 
 export const useSessionStore = create<SessionState>((set) => ({

@@ -11,6 +11,7 @@ const TransfersPage    = lazy(() => import('../features/transfers/pages/Transfer
 const InternationalPage= lazy(() => import('../features/international/pages/InternationalPage').then((m) => ({ default: m.InternationalPage })));
 const ProfilePage      = lazy(() => import('../features/profile/pages/ProfilePage').then((m) => ({ default: m.ProfilePage })));
 const SettingsPage     = lazy(() => import('../features/settings/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
+const CareerDirectorPage = lazy(() => import('../features/careerDirector/pages/CareerDirectorPage').then((m) => ({ default: m.CareerDirectorPage })));
 
 const Loading = () => (
   <div style={{ display: 'grid', placeItems: 'center', height: '40vh', color: 'var(--muted)', fontSize: '13px' }}>
@@ -32,6 +33,7 @@ const router = createBrowserRouter([
       { path: 'international',   element: <Suspense fallback={<Loading />}><InternationalPage /></Suspense> },
       { path: 'profile',         element: <Suspense fallback={<Loading />}><ProfilePage /></Suspense> },
       { path: 'settings',        element: <Suspense fallback={<Loading />}><SettingsPage /></Suspense> },
+      { path: 'career/:careerId/career-director', element: <Suspense fallback={<Loading />}><CareerDirectorPage /></Suspense> },
     ],
   },
 ]);

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../../components/shared/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import { Modal } from '../../../components/ui/Modal';
@@ -13,6 +14,7 @@ import { fmtDate } from '../../../utils/date';
 import { FolderOpen, PlusCircle, Trash2 } from 'lucide-react';
 
 export const CareersPage: React.FC = () => {
+  const navigate = useNavigate();
   const careers = useCareerStore((s) => s.careers);
   const activeCareerId = useCareerStore((s) => s.activeCareerId);
   const loadCareers = useCareerStore((s) => s.loadCareers);
@@ -166,6 +168,14 @@ export const CareersPage: React.FC = () => {
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   <Button
                     size="sm"
+                    variant="ghost"
+                    disabled={isBusy}
+                    onClick={() => navigate(`/career/${career.id}/career-director`)}
+                  >
+                    Director
+                  </Button>
+                  <Button
+                    size="sm"
                     variant={isActive ? 'accent' : 'ghost'}
                     disabled={isActive || isBusy}
                     onClick={() => {
@@ -222,4 +232,3 @@ export const CareersPage: React.FC = () => {
     </div>
   );
 };
-
